@@ -1,3 +1,8 @@
 /DATA_Signal_X_PSI2S_MLsel.root
 /renameBranches.C
 /renameTree.C
+
+*.root
+*.txt
+*.pdf
+*.log
