@@ -62,7 +62,7 @@
 
     TString ACCcuts_PbPb_Bu = 
         // Trk Acceptance
-        "(Btrk1Eta < 2.4 && (Btrk1Pt  > 0.9)"                     // <--------
+        "(Btrk1Eta < 2.4) && (Btrk1Pt  > 0.9)"                     // <--------
         // muon Acceptance   
         "&& (Bmu1isAcc == 1 && Bmu2isAcc == 1)";   
 
@@ -85,7 +85,7 @@
         "&& (Btrk1Chi2ndf/(Btrk1nPixelLayer + Btrk1nStripLayer)) < 0.18 "
         "&& Btrk1highPurity"
         // Muon Selection
-        "&& (Bmu1HybridSoftMuID == 1 && Bmu1HybridSoftMuID == 1)"   // <--------
+        "&& (Bmu1HybridSoftMuID == 1 && Bmu2HybridSoftMuID == 1)"   // <--------
         // Dimuon Selection
         "&& abs(Bujmass - 3.096916) < 0.15 "
         "&& BujvProb > 0.01";

@@ -13,8 +13,8 @@ double minhisto_X=3.6;
 double maxhisto_X=4.0;
 
 
-const int N_pt_Bins_X = 6;
-std::vector<double> ptbinsvec_X = {5, 7.5, 10, 15, 25, 50, 100};
+const int N_pt_Bins_X = 5;
+std::vector<double> ptbinsvec_X = {5, 15, 20, 25, 50, 100};
 
 ///FOR TESTING TESTING
 //const int N_pt_Bins_X = 1;

@@ -1,5 +1,5 @@
-DOANALYSISPbPb_FULL_X=1
-DOANALYSISPbPb_BINNED_PT_X=0
+DOANALYSISPbPb_FULL_X=0
+DOANALYSISPbPb_BINNED_PT_X=1
 DOANALYSISPbPb_BINNED_Y_X=0
 DOANALYSISPbPb_BINNED_MULT_X=0
 
@@ -9,15 +9,14 @@ syst="ppRef"
 
 
 #Data and MC Samples
-MC_X="/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2024/MC_X3872_ppRef.root"
-MC_Psi="/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2024/MC_PSI2S_ppRef.root"
-Data_X="/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2024/DATA_X3872_ppRef.root"    ###Rectandular cuts
-#Data_X="/eos/user/h/hmarques/Analysis_CODES/DATA_Signal_X_PSI2S_TrM.root"              ###From Prince ML
+MC_X="/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2024/flat_ntmix_ppRef_MC.root"
+Data_X="/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2024/flat_ntmix_ppRef_DATA.root"    ###Rectandular cuts
+#Data_X="/eos/user/h/hmarques/Analysis_CODES/DATA_Signal_X_PSI2S_TrM.root"            ###From Prince ML
 #Data and MC Samples
 
-## NEW CUTS (selection?) here 
-CUTs="BQvalueuj<0.1 && Btrk1dR < 0.6 && Btrk2dR < 0.6"
-
+## SELECTION CUTs go here 
+CUTs="BQvalue<0.15 && Btrk1dR < 0.55 && Btrk2dR < 0.55"
+#CUTs="1"
 
 
 mkdir -p ROOTfiles/
@@ -40,20 +39,29 @@ root -b -q "roofitB.C++(\"ntmix\", \
                       \"$CUTs\", \
                       \"$OutputFile_X_FULL\", \
                       \"results/X/Bpt\", \
-                      \"$MC_Psi\", \
+                      \" \", \
                       \"$syst\")"
 fi
 
-#if [ $DOANALYSISPbPb_BINNED_PT_X  -eq 1  ]; then
-#root -b -q 'roofitB.C('\"ntmix\"','0','\"$Data_X\"','\"$MC_X\"','\"Bpt\"'  ,'\"$CUTs\"','\"$OutputFile_X_BINNED_PT\"'  ,'\"results/X/Bpt\"'  ,'\"$MC_Psi\"', '\"$syst\"')'
-#fi
+if [ $DOANALYSISPbPb_BINNED_PT_X  -eq 1  ]; then
+root -b -q "roofitB.C(\"ntmix\",\
+                      0, \
+                      \"$Data_X\", \
+                      \"$MC_X\", \
+                      \"Bpt\", \
+                      \"$CUTs\", \
+                      \"$OutputFile_X_BINNED_PT\", \
+                      \"results/X/Bpt\", \
+                      \" \", \
+                      \"$syst\")"
+fi
 
 #if [ $DOANALYSISPbPb_BINNED_Y_X  -eq 1  ]; then
-#root -b -q 'roofitB.C('\"ntmix\"','0','\"$Data_X\"','\"$MC_X\"','\"By\"'   ,'\"$CUTs\"','\"$OutputFile_X_BINNED_Y\"'   ,'\"results/X/By\"'   ,'\"$MC_Psi\"', '\"$syst\"')'
+#root -b -q 'roofitB.C('\"ntmix\"','0','\"$Data_X\"','\"$MC_X\"','\"By\"'   ,'\"$CUTs\"','\"$OutputFile_X_BINNED_Y\"'   ,'\"results/X/By\"'  , '\" \"', '\"$syst\"')'
 #fi
 
 #if [ $DOANALYSISPbPb_BINNED_MULT_X  -eq 1  ]; then
-#root -b -q 'roofitB.C('\"ntmix\"','0','\"$Data_X\"','\"$MC_X\"','\"nMult\"','\"$CUTs\"','\"$OutputFile_X_BINNED_MULT\"','\"results/X/nMult\"','\"$MC_Psi\"', '\"$syst\"')'
+#root -b -q 'roofitB.C('\"ntmix\"','0','\"$Data_X\"','\"$MC_X\"','\"nMult\"','\"$CUTs\"','\"$OutputFile_X_BINNED_MULT\"','\"results/X/nMult\"', '\" \"', '\"$syst\"')'
 #fi
 
 rm roofitB_C.d roofitB_C_ACLiC_dict_rdict.pcm roofitB_C.so

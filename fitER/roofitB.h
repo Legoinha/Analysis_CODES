@@ -87,7 +87,6 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	RooRealVar sigma1_specMC(Form("sigma1_specMC%d_%s",_count,pdf.Data()),"",0.005,0.0005,0.01);
 	RooRealVar sigma2_specMC(Form("sigma2_specMC%d_%s",_count,pdf.Data()),"",0.001,0.0005,0.01);
 	RooRealVar sigma3_specMC(Form("sigma3_specMC%d_%s",_count,pdf.Data()),"",0.005,0.0005,0.01);
-
 	RooRealVar* scale_specMC = new RooRealVar("scale_specMC","scale_specMC",1,0.1,2);
 	RooProduct scaled_sigma1_specMC(Form("scaled_sigma1_specMC%d_%s",_count,pdf.Data()),"scaled_sigma1_specMC", RooArgList(*scale_specMC,sigma1_specMC));
 	RooProduct scaled_sigma2_specMC(Form("scaled_sigma2_specMC%d_%s",_count,pdf.Data()),"scaled_sigma2_specMC", RooArgList(*scale_specMC,sigma2_specMC));
@@ -99,16 +98,16 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	RooRealVar sig2frac_specMC(Form("sig2frac_specMC%d_%s",_count,pdf.Data()),"", 0.5, 0.01, 1);
 	RooAddPdf* sig_specMC = new RooAddPdf(Form("sig_specMC%d_%s",_count,pdf.Data()),"",RooArgList(sig1_specMC,sig2_specMC),RooArgList(sig1frac_specMC), true);
 
-	RooRealVar* nsig_specMC=nullptr;
-	RooRealVar* nsigMC=nullptr;
+	RooRealVar*nsig_specMC=nullptr;
+	RooRealVar*nsigMC=nullptr;
     if(tree == "ntmix"){
-		float nsigMC_0      = (dsMC->reduce("Bmass > 3.8"))->sumEntries();  //X3872 MC signal
-		float nsig_specMC_0 = (dsMC->reduce("Bmass < 3.8"))->sumEntries();  //Psi2s MC signal
-		nsig_specMC = new RooRealVar(Form("nsig_specMC%d_%s",_count,pdf.Data()),"",nsig_specMC_0, 0.9*nsig_specMC_0, 1.2 * nsig_specMC_0);
-		nsigMC      = new RooRealVar(Form("nsigMC%d_%s",_count, pdf.Data()),"",nsigMC_0, 0.9*nsigMC_0, 1.2 * nsigMC_0);
+		float nsigMC_0      = (dsMC->reduce("isX3872==1"))->sumEntries();  //X3872 MC signal
+		float nsig_specMC_0 = (dsMC->reduce("isX3872==0"))->sumEntries();  //Psi2s MC signal
+		nsig_specMC = new RooRealVar(Form("nsig_specMC%d_%s",_count,pdf.Data()),"",nsig_specMC_0, 0.9*nsig_specMC_0, 1.1 * nsig_specMC_0);
+		nsigMC      = new RooRealVar(Form("nsigMC%d_%s",_count, pdf.Data()),"",nsigMC_0, 0.9*nsigMC_0, 1.1 * nsigMC_0);
 		w.import(*nsig_specMC);
 	}else{
-		nsigMC = new RooRealVar(Form("nsigMC%d_%s",_count, pdf.Data()),"",dsMC->sumEntries(), 0.9*dsMC->sumEntries(), 1.2 * dsMC->sumEntries());
+		nsigMC = new RooRealVar(Form("nsigMC%d_%s",_count, pdf.Data()),"",dsMC->sumEntries(), 0.9*dsMC->sumEntries(), 1.1 * dsMC->sumEntries());
 	}
 	w.import(*nsigMC);
 
@@ -120,7 +119,7 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 		if(variation =="" && pdf=="") modelMC = new RooAddPdf(Form("modelMC%d_%s",_count, pdf.Data()),"",RooArgList(*sigMC),RooArgList(*nsigMC));
 	}
 
-//////////ROOFIT ROOFIT ROOFIT  MC MC MC MC MC
+	//////////ROOFIT ROOFIT ROOFIT  MC MC MC MC MC
 
 	mass->setRange("signal",init_mean-0.032, init_mean+0.032);  //focus the MC fit to the signal region to prevent statistical flutuations
 	if(tree=="ntmix"){mass->setRange("signal_psi2s",init_mean_PSI2S-0.022, init_mean_PSI2S+0.022);}
@@ -137,18 +136,18 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	cout << "Signal MC FIT Done" << endl;
 	cout << "PLOTing IT !!" << endl;
 
+	///////////PLOT MC FIT
 	if ((variation=="signal" || variation=="") && pdf!="fixed"){
 		plot_mcfit(_count, pdf.Data(), cMC, w, which_var, dsMC, tree, NBIN, binmin, binmax);
 	}
 
-	///////////ROOFIT ROOFIT ROOFIT MC MC MC MC MC.  
-
+	///////////ROOFIT ROOFIT ROOFIT MC MC MC MC MC  
 
 
     // FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp FIT MCnp
-    if(tree == "ntKp" && variation=="" && pdf==""){ 
+    if(false && tree == "ntKp" && variation=="" && pdf==""){ 
 
-        // DEFINE MODEL to fit the non prompt background
+        //DEFINE MODEL to fit the non prompt background
         //inclusive MC signal Model
         RooRealVar* meannp = 0;
         RooRealVar* sigma1np = 0;
@@ -228,12 +227,12 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	p2->SetTicks(1,1); 
 	p2->Draw();
 
-	double n_signal_initial = ds->sumEntries(TString::Format("abs(Bmass-%g)<0.005",init_mean)) ;
+	double n_signal_initial = ds->sumEntries(TString::Format("abs(Bmass-%g)<0.006",init_mean)) ;
 	cout << "n_signal_initial " << n_signal_initial << endl; 
 
 	double n_signal_initial_spec=0;
 	if (tree == "ntmix"){
-		n_signal_initial_spec = ds->sumEntries(TString::Format("abs(Bmass-%g)<0.005",init_mean_PSI2S));
+		n_signal_initial_spec = ds->sumEntries(TString::Format("abs(Bmass-%g)<0.006",init_mean_PSI2S));
 		cout << "n_signal_initial_spec " << n_signal_initial_spec << endl; 
 	}
 
@@ -280,7 +279,7 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	RooRealVar* sig1frac_spec  = nullptr;
 	RooRealVar* sig2frac_spec  = nullptr;
     if(tree == "ntmix" ){
-		nsig_spec = new RooRealVar(Form("nsig_spec%d_%s",_count,pdf.Data()),"",n_signal_initial_spec*0.8,n_signal_initial_spec*0.4,n_signal_initial_spec);
+		nsig_spec = new RooRealVar(Form("nsig_spec%d_%s",_count,pdf.Data()),"",n_signal_initial_spec*0.9,n_signal_initial_spec*0.7,n_signal_initial_spec*1.1);
         mean_spec = new RooRealVar(Form("mean_spec%d_%s",_count,pdf.Data()),"",mean_specMC.getVal(),mean_specMC.getVal()-0.03,mean_specMC.getVal()+0.03) ;
 	    sigma1_spec = new RooRealVar(Form("sigma1_spec%d_%s",_count,pdf.Data()),"",sigma1_specMC.getVal(),0.001,0.1) ;
 	    sigma2_spec = new RooRealVar(Form("sigma2_spec%d_%s",_count,pdf.Data()),"",sigma2_specMC.getVal(),0.001,0.1) ;
@@ -487,12 +486,12 @@ RooFitResult *fit(TString variation, TString pdf,TString tree, TCanvas* c, TCanv
 	line_ref->SetLineWidth(1);
 	line_ref->Draw("same");
 
-	cout << "-----------------------------------------------------------------------------------------------------------------------------" << endl;
-	cout << "Signal Yield = " << nsig.getVal() << "     yield Error = " << nsig.getError() << "     yield Error Up = " << nsig.getAsymErrorHi() << "     yieldPrintErrDown = " << nsig.getAsymErrorLo() << endl;
-	cout << "-----------------------------------------------------------------------------------------------------------------------------" << endl;
+	cout << "\n -------------------------------------------------------------------------------------- \n" << endl;
+	cout << "Signal Yield = " << nsig.getVal() << "     yield Error = " << nsig.getError()     ;
+	cout << "\n -------------------------------------------------------------------------------------- \n" << endl;
 	if(tree=="ntmix"){
-		cout << "PSI(2S) Signal Yield = " << nsig_spec->getVal() << "     yield Error = " << nsig_spec->getError() << "     yield Error Up = " << nsig_spec->getAsymErrorHi() << "     yieldPrintErrDown = " << nsig_spec->getAsymErrorLo() << endl;
-		cout << "-----------------------------------------------------------------------------------------------------------------------------" << endl;
+		cout << "PSI(2S) Signal Yield = " << nsig_spec->getVal() << "     yield Error = " << nsig_spec->getError() ;
+		cout << "\n -------------------------------------------------------------------------------------- \n" << endl;
 	}
 
 	p1->cd();

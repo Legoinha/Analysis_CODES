@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 #include "../plotER/aux/parameters.h"  
-#include "../plotER/aux/ACCSEL.h"
 
 void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString treeName, TString sample, TString system="ppRef", TString DOselCUTS="1");
 std::pair<int, std::vector<double>> defineBinning(const TString& var, const TString& tree, int full);
@@ -53,8 +52,8 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	//cout << endl << endl;
 	// PRINT WHAT IS ABOUT TO HAPPEN //
 
-	TString NEWcuts = Form("%s",CUT.Data()); 
-	cout << "seldata= "<< NEWcuts << endl;
+	TString SELcuts = Form("%s",CUT.Data()); 
+	cout << "SELECTION cuts = "<< SELcuts << endl;
 	cout << endl << endl;
 
 	//DEFINE VARIABLES
@@ -67,32 +66,27 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	RooRealVar* pt    = new RooRealVar("Bpt","Bpt",0,200);
 	RooRealVar* y     = new RooRealVar("By","By",-2.4, 2.4);
 	RooRealVar* nMult = new RooRealVar("nMult","nMult",0,100);
+	RooRealVar* isX3872 = new RooRealVar("isX3872","isX3872",0,1); // 1 = X(3872) , 0 = PSI2S
 
 	RooWorkspace* ws = new RooWorkspace("ws");
 	ws->import(*mass);
 	ws->import(*y);
 	ws->import(*pt);
 	ws->import(*nMult);
+	ws->import(*isX3872); // <- only needed for X3872 analysis
 
 	//DATA and MC SAMPLES
 	vector<TString>   ANA_vars = {"Bpt", "By"};
-	read_samples(*ws, ANA_vars, INPUTDATA.Data(), TREE.Data(), "data", SYSTEM.Data(), NEWcuts);
-	read_samples(*ws, ANA_vars, INPUTMC.Data()  , TREE.Data(),   "mc", SYSTEM.Data(), NEWcuts);
-
+	read_samples(*ws, ANA_vars, INPUTDATA.Data(), TREE.Data(), "data", SYSTEM.Data(), SELcuts);
+	read_samples(*ws, ANA_vars, INPUTMC.Data()  , TREE.Data(),   "mc", SYSTEM.Data(), SELcuts);
 	RooDataSet* data = (RooDataSet*) ws->data("data");
 	RooDataSet* mc   = (RooDataSet*) ws->data("mc");
-	cout << "Total DATA entries: " << data->sumEntries() << "\n"; 
-	cout << "Total   MC entries: " << mc  ->sumEntries() << "\n";
-
-	RooDataSet* mc_spec = nullptr;
+	cout << "Total DATA entries: " << data->sumEntries() << "\n";
 	if ("ntmix"==TREE){
-		read_samples(*ws, ANA_vars, ExtraMCsample.Data(), TREE.Data(), "mc_spec", SYSTEM.Data(), NEWcuts);
-		mc_spec = (RooDataSet*) ws->data("mc_spec");		
-		//mc_spec = (RooDataSet*) mc_spec->reduce(NEWcuts);
-		cout << "Total MC (PSI2S) entries: " << mc_spec->sumEntries() << "\n";
-		mc->append(*mc_spec);
-        cout << "Total MC (merged) entries: " << mc->sumEntries() << "\n";
+		cout << "X3872 sig MC entries: " << mc->sumEntries("isX3872") << "\n";
+		cout << "PSI2S sig MC entries: " << mc->sumEntries("!isX3872") << "\n";
 	}
+	else{cout << "Total   MC entries: " << mc->sumEntries() << "\n";}
 	//DATA and MC SAMPLES
 
 	//MODELS for syst studies
@@ -187,8 +181,6 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		ith_MC_bin  ->SetName(Form("mc%d"  , _count));
 		cout << "Total DATA entries in "<< i << "-th BIN: " << ith_DATA_bin->numEntries() << "\n";
 		cout << "Total   MC entries in "<< i << "-th BIN: " << ith_MC_bin  ->numEntries() << "\n";
-		RooRealVar * MC_candidates = new RooRealVar(Form("MC_candidates_%d",_count),"MC_candidates", ith_MC_bin->sumEntries());
-		ws->import(*MC_candidates);
 		//BINNING OF THE DATA
 
 		if(VAR == "Bpt"){var_mean_av[i] = ith_DATA_bin->mean(*pt);}     	
@@ -851,37 +843,16 @@ void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString
 	TTree* tIn = (TTree*) fin->Get(treeName);
 	//std::cout << "Tree entries: " << tIn->GetEntries() << std::endl;
 
-	// Ensure data is well selected
-	TString SELcuts    = SELcuts_ppRef;
-	TString trgmatches = TRGmatching;
-	TString ACCcuts    = ACCcuts_ppRef;
-	if (treeName == "ntKp") {
-		SELcuts = SELcuts_ppRef_Bu;
-		ACCcuts = ACCcuts_ppRef_Bu;
-	}
-	if (colsys == "pbpb" || colsys == "PbPb") {
-		SELcuts = SELcuts_PbPb;
-		ACCcuts = ACCcuts_PbPb;
-		if (treeName == "ntKp") {
-			SELcuts = SELcuts_PbPb_Bu;
-			ACCcuts = ACCcuts_PbPb_Bu;
-		}
-		trgmatches = "1";
-	}
-
-	TString fullCut = Form("(%s) && (%s) && (%s) && "
-						"((Bpt < 10 && abs(By) > 1.5) || (Bpt > 10)) && "
-						"(%s) &&"
-						"(Bmass > %f) && (Bmass < %f)",
-						ACCcuts.Data(), SELcuts.Data(), trgmatches.Data(),
-						DOselCUTS.Data(),
+	TString fullCut = Form("((Bpt < 10 && abs(By) > 1.5) || (Bpt > 10))" // Fid region
+						"&& (%s)"
+						"&& (Bmass > %f) && (Bmass < %f)",
+						DOselCUTS.Data(), // defined in .sh file (for each particle)
 						minhisto, maxhisto);
 
 	TDirectory* savedDir = gDirectory;
 	gROOT->cd();                 
 	TTree* t1 = tIn->CopyTree(fullCut);
 	savedDir->cd();              
-	//std::cout << "Skimmed entries: " << t1->GetEntries() << std::endl;
 
 	if(true){
 		// Create a canvas to draw the mass histogram
@@ -913,6 +884,7 @@ void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString
 	// Get the variables	
 	RooArgList arg_list("arg_list");
 	arg_list.add(*(w.var("Bmass")));
+	if(treeName=="ntmix" && sample=="mc"){arg_list.add(*(w.var("isX3872")));}
 	for(auto lab : label){arg_list.add(*(w.var(lab)));}
 	RooDataSet* data_s = new RooDataSet(sample, sample, t1, arg_list);
 	w.import(*data_s);
