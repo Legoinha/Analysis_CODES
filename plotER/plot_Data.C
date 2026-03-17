@@ -15,12 +15,12 @@ void plot_Data(TString TREE ="ntphi", TString systemNAME = "ppRef"){
     TChain chain(Form("%s", TREE.Data()));
 
     if(systemNAME.Contains("PbPb")){//PbPb data
-        chain.Add("/lstore/cms/hlegoinha/DATA_X3872_PbPb.root");    
+        chain.Add("/lstore/cms/hlegoinha/DATA_X3872_PbPb.root");
     } else {//ppRef data
-        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/Flattening/flat_ntmix_ppRef_DATA.root");}
-        else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/Flattening/flat_ntKp_ppRef_DATA.root");}
-        else if (TREE == "ntphi"){  chain.Add("/eos/user/h/hmarques/Analysis_CODES/Flattening/flat_ntphi_ppRef_DATA.root");}
-        else if (TREE == "ntKstar"){chain.Add("/eos/user/h/hmarques/Analysis_CODES/Flattening/flat_ntKstar_ppRef_DATA.root");}
+        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");}
+        else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");}
+        else if (TREE == "ntphi"){  chain.Add("/eos/user/h/hmarques/Analysis_CODES/plotER/Data_Bs.root");}
+        else if (TREE == "ntKstar"){chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root");}
     }
     std::cout << "DATA entries: " << chain.GetEntries() << std::endl;
 
@@ -29,25 +29,33 @@ void plot_Data(TString TREE ="ntphi", TString systemNAME = "ppRef"){
     canvas->SetLeftMargin(0.15); // or try 0.18 for more space
 
     // Define histogram parameters
-    double hist_Xlow = 5;      // Minimum Bmass
-    double hist_Xhigh = 5.8;   // Maximum Bmass
+    double hist_Xlow = 5;     // Minimum Bmass
+    double hist_Xhigh = 5.8;  // Maximum Bmass
     if (TREE == "ntmix"){hist_Xlow = 3.6; hist_Xhigh = 4.0;}
     int nbinsmasshisto = 100;    
     double bin_length_MEV = (hist_Xhigh - hist_Xlow)*1000 / nbinsmasshisto;
 
-    TString SELECTIONcuts = "Bnorm_svpvDistance_2D > 4 "
-                            "&& Bpt > 5";
+    TString SELECTIONcuts = "";
+
     if (TREE == "ntmix") {
-        SELECTIONcuts = "BQvalue <  0.15 "
-                        "&& Bpt > 5 "
+        SELECTIONcuts = "BQvalue    < 0.15"
                         "&& Btrk1dR < .55 "
-                        "&& Btrk2dR < .55 ";
+                        "&& Btrk2dR < .55 "
+                        "&& Bmass   > 3.6 && Bmass < 4.0";
     }
+    else if (TREE != "ntmix"){ SELECTIONcuts = "Bnorm_svpvDistance_2D > 4" ;}
+
     //SELECTIONcuts = "1";
     cout << "Applying selection cuts: " << SELECTIONcuts.Data() << std::endl;
 
+    TString Xlabel;
+    if (TREE == "ntmix")       {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} (GeV)";} 
+    else if (TREE == "ntphi")  {Xlabel = "m_{J/#Psi K^{+} K^{-}} (GeV)";    }
+    else if (TREE == "ntKp")   {Xlabel = "m_{J/#Psi K^{+}} (GeV)";          }
+    else if (TREE == "ntKstar"){Xlabel = "m_{J/#Psi K^{+} #pi^{-}} (GeV)";  }
+
     // Create an histogram for Bmass
-    TH1F *hist_Bmass = new TH1F("hist_Bmass", Form("; m_{J/#Psi #pi^{+} #pi^{-}} ; Entries / %.1f MeV", bin_length_MEV), nbinsmasshisto, hist_Xlow, hist_Xhigh);
+    TH1F *hist_Bmass = new TH1F("hist_Bmass", Form("; %s ; Entries / %.1f MeV", Xlabel.Data(), bin_length_MEV), nbinsmasshisto, hist_Xlow, hist_Xhigh);
     chain.Draw("Bmass >> hist_Bmass", Form("%s ",SELECTIONcuts.Data()));
     // Customize the histogram
     hist_Bmass->SetLineColor(kBlack);
@@ -76,4 +84,3 @@ void plot_Data(TString TREE ="ntphi", TString systemNAME = "ppRef"){
     delete hist_Bmass;
     delete canvas;
 }
-

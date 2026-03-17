@@ -10,13 +10,13 @@
 #include "aux/parameters.h"
 #include "aux/masses.h"
 
-void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
+void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
 {
 
     //VARIABLES to be plotted
     //VARIABLES
-    const char * variables[] = {"BsvpvDistance_2D", "Balpha", "Bpt", "BQvalue", "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2cl", "Btrk1dR", "Btrk1Pt", "Bnorm_svpvDistance_2D",   "Bnorm_trk1Dxy"};
-    const double ranges[][2] = {{0,0.05},           {0,3.14}, {0,150},   {0,1.9},  {0,2},       {0.9,1},    {0,0.45},  {0.0,1},     {0,1},  {0., 5},                {0,2},           {-50,50}};
+    const char * variables[] = {"Bmass", "abs(BLxy)",   "Bujmass", "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",   "Balpha",   "Bpt",     "BQvalue",    "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D",   "Bnorm_trk1Dxy"};
+    const double ranges[][2] = {{3.6,4},    {0,0.1},  {2.9,3.25},           {0,0.25},    {0,2.4},         {0,1},   {0,3.14},  {0,50},     {0.0,1},    {0.0,1.5},       {0.9,1},    {0,0.45},     {0.0,1},     {0,1},    {0.,5},    {0.,5},                  {0,20},          {-50,50}};
     
     //VARIABLES
     
@@ -37,17 +37,21 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
         }
     }
     else{ //ppRef system
-        if (TREE == "ntmix"){ //X3872
+        if (TREE == "ntmix"){      //X3872
             chain.Add( "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");
             path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MC.root";
         } 
         else if (TREE == "ntphi"){ //B0s
             chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA.root"); 
-            path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/MC_Bs.root";
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_MC.root";
         }
-        else if (TREE == "ntKp"){ //B+
+        else if (TREE == "ntKp"){  //B+
             chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root"); 
-            path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/MC_Bu.root";
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_MC.root";
+        }
+        else if (TREE == "ntKstar"){  //B0
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root"); 
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_MC.root";
         }
     }
 
@@ -94,13 +98,13 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
         TString sideband = "1"; 
         if (true){ // BKG from DATA sideband
             if(TREE == "ntmix"){                            sideband = "(Bmass < 3.60 || Bmass > 3.95 || (Bmass > 3.75 && Bmass < 3.8))";}
-            else if (TREE == "ntphi" || TREE == "ntKstar") {sideband = "(Bmass > 5.55 || Bmass < 5.15  )";}
+            else if (TREE == "ntphi" || TREE == "ntKstar") {sideband = "(Bmass > 5.55)";}
             else if (TREE == "ntKp")                       {sideband = "(Bmass > 5.55 )";}
         }
 
-        TString ANYsel = "1" ;// "((Bpt < 10 && abs(By) > 1.5) || (Bpt > 10))"; //Fiducial region
+        TString ANYsel = "1"; // customize if needed
 
-        if (TREE == "ntmix" && false) {
+        if (TREE == "ntmix") {
             tree_MC->Draw(Form("%s >> hist_SIG" , var.Data()), Form(" %s && isX3872==1 ", ANYsel.Data()));
             tree_MC->Draw(Form("%s >> hist_spec", var.Data()), Form(" %s && isX3872==0 ", ANYsel.Data()));
         } else {
@@ -113,7 +117,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
         // Customize Histograms
         hist_SIG->SetLineColor(kOrange-3);
         hist_SIG->Scale(1.0 / hist_SIG->Integral());
-        if(TREE == "ntmix" && false){
+        if(TREE == "ntmix"){
             hist_SIG->SetLineWidth(3);
             hist_spec->SetLineColor(kOrange-2);
             hist_spec->SetLineWidth(3);
@@ -134,7 +138,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
 
         // Draw the histograms
         hist_SIG->Draw("HIST");
-        if (TREE == "ntmix" && false) hist_spec->Draw("HIST SAME");
+        if (TREE == "ntmix") hist_spec->Draw("HIST SAME");
         hist_BKG->Draw("HIST SAME");
         gPad->Update();
 
@@ -143,7 +147,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb23")
         leg->SetBorderSize(0);
         leg->SetFillStyle(0);
         leg->SetTextSize(0.03);
-        if (TREE == "ntmix" && false) {
+        if (TREE == "ntmix") {
             leg->AddEntry(hist_SIG, "MC Sig: X(3872)", "l");
             leg->AddEntry(hist_spec, "MC Sig: #Psi(2S)", "l");
         } else {

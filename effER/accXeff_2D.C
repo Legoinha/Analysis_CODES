@@ -9,6 +9,7 @@
 #include "TObjArray.h"
 #include "TSystem.h"
 #include <iostream>
+#include <vector>
 
 // Make a 2D ACC ratio map: (passes ACC) / (total) in (Bpt, By)
 // Inputs:
@@ -16,8 +17,7 @@
 //  - SYSTEM:    "ppRef" or one of PbPb23/PbPb24/PbPb25 (PbPb all use same ACC)
 
 
-
-void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
+void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef", bool forX = true)
 {
 
     // Setting Up 
@@ -29,37 +29,54 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
         }
     }
     else{ //ppRef system
-        if (treename == "ntmix"){ //X3872
-            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MCwGenInfo.root";
+        if (treename == "ntmix"){        //X3872
+            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MC.root";
         } 
-        else if (treename == "ntphi"){ //B0s
-            path_to_MC = "";
+        else if (treename == "ntphi"){   //B0s
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_MC.root";
         }
-        else if (treename == "ntKp"){ //B+
-            path_to_MC = "";
+        else if (treename == "ntKp"){    //B+
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_MC.root";
+        }
+        else if (treename == "ntKstar"){ //B0
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_MC.root";
         }
     }
 
     gSystem->Exec("mkdir -p output/");
     gSystem->Exec("mkdir -p output/ROOTs/");
 
-    // 2D binning for pT and y
-    const int nPtBins = 100;  double ptMin = 0.0, ptMax = 50.0;
-    const int nYBins  = 100;  double yMin  = 0.0, yMax  =  2.4;
 
-    // FID REGION (gen-level)
-    TString FIDreg_GEN  = "(Gpt < 50 && abs(Gy) < 2.4) "; //gen-level
-    TString FIDreg_RECO = "(Bpt < 50 && abs(By) < 2.4) "; //reco-level
+    ///////////////////// BINNING /////////////////////
+
+    // variable pT binning
+    std::vector<double> ptBins = { 0,5,7.5,10,15,20, 25, 30, 35, 40, 50};
+    const int nPtBins = ptBins.size() - 1;
+
+    // variable y binning (optional)
+    std::vector<double> yBins = {0.0, 0.5, 1, 1.4, 1.8, 2, 2.4};
+    const int nYBins = yBins.size() - 1;
+
+    ///////////////////// BINNING /////////////////////
+
+
 
     // Open file and tree
     TFile *fin = TFile::Open(path_to_MC, "READ");
     TTree *tree_reco = (TTree*)fin->Get(treename);
     TTree *tree_gen  = (TTree*)fin->Get("ntGen");
 
+    // 2D hists (create AFTER opening TFile to avoid directory issues)
+    TH2D *hDen_ACC = new TH2D("hDen_ACC",";p_{T};|y|;denom", nPtBins, ptBins.data(), nYBins, yBins.data());
+    TH2D *hNum_ACC = new TH2D("hNum_ACC",";p_{T};|y|;numer", nPtBins, ptBins.data(), nYBins, yBins.data());
+    hDen_ACC->Sumw2();
+    hNum_ACC->Sumw2();
+
     std::cout << "2D_ACC_EFF: \ninput=" << path_to_MC << "\ntree=" << treename << "\nSYSTEM=" << SYSTEM << std::endl;
-    std::cout << "FID region: " << FIDreg_RECO << std::endl;
-
-
+    if (treename == "ntmix") {
+        if (forX) std::cout << "Processing X(3872)" << std::endl;
+        else      std::cout << "Processing Psi(2S)" << std::endl;
+    }
 
 
     // ------------------------- ACC ------------------------- //
@@ -88,20 +105,20 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     TString TRK_acc = "(" + TRK_y_ACC + " && " + TRK_pT_ACC + ")";
 
     //Full ACC cut (muons + tracks)
-    TString ACCcut = "(" + MUONacc + " && " + TRK_acc + " && " + FIDreg_GEN + ")";
-    std::cout << "ACC cuts: " << ACCcut << "\n" <<std::endl;
+    TString ACCcut = "(" + MUONacc + " && " + TRK_acc + ")";
+    if (treename == "ntmix") {
+        TString GEN_PDG = forX ? "(abs(GpdgId) == 20443)" : "(abs(GpdgId) == 100443)";
+        ACCcut = "(" + ACCcut + " && " + GEN_PDG + ")";
+    }
+    std::cout << "ACC cuts: " << "(" + MUONacc + " && " + TRK_acc + ")" << "\n" <<std::endl;
 
-    std::cout << "No ACC cut: "<<  tree_gen->GetEntries(FIDreg_GEN) <<" Gen signals"       << std::endl;
-    std::cout << "w/ ACC cut: "<<  tree_gen->GetEntries(ACCcut)     <<" surviving ACC cut" << std::endl;
+    TString GENcut = "1";
+    if (treename == "ntmix") { GENcut = forX ? "(abs(GpdgId) == 20443)" : "(abs(GpdgId) == 100443)"; }
+    std::cout << "No ACC cut: "<<  tree_gen->GetEntries(GENcut) << " Gen signals"       << std::endl;
+    std::cout << "w/ ACC cut: "<<  tree_gen->GetEntries(ACCcut) <<" surviving ACC cut" << std::endl;
 
-    // 2D Histograms
-    TH2D *hDen_ACC = new TH2D("hDen_ACC", ";p_{T} [GeV];|y|;denom", nPtBins, ptMin, ptMax, nYBins, yMin, yMax);
-    TH2D *hNum_ACC = new TH2D("hNum_ACC", ";p_{T} [GeV];|y|;numer", nPtBins, ptMin, ptMax, nYBins, yMin, yMax);
-    hDen_ACC->Sumw2();
-    hNum_ACC->Sumw2();
-
-    tree_gen->Draw("abs(Gy):Gpt>>hNum_ACC", ACCcut    , "goff");  // Fill Numerator 
-    tree_gen->Draw("abs(Gy):Gpt>>hDen_ACC", FIDreg_GEN, "goff");  // Fill Denominator 
+    tree_gen->Draw("abs(Gy):Gpt>>hDen_ACC", GENcut, "goff");  // Fill Denominator 
+    tree_gen->Draw("abs(Gy):Gpt>>hNum_ACC", ACCcut, "goff");  // Fill Numerator 
 
     // Compute ratio with binomial errors
     TH2D *hACC = (TH2D*)hNum_ACC->Clone("hACC");
@@ -109,7 +126,7 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     hACC->Divide(hNum_ACC, hDen_ACC, 1.0, 1.0, "B");
 
     // Style and draw
-    gStyle->SetOptStat(0)  ;
+//    gStyle->SetOptStat(0)  ;
     TCanvas *cACC = new TCanvas("cACC", "ACC Ratio 2D", 900, 700);
     cACC->SetRightMargin(0.15);
     hACC->SetMinimum(0.0);
@@ -118,8 +135,10 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     hACC->Draw("COLZ")  ;
 
     // Save outputs
-    TString Acc_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_ACC.pdf";
-    TString rootName_ACC = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_ACC.root";
+    TString suffix = "";
+    if (treename == "ntmix") suffix = forX ? "_X3872" : "_Psi2S";
+    TString Acc_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_ACC" + suffix + ".pdf";
+    TString rootName_ACC = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_ACC" + suffix + ".root";
     cACC->SaveAs(Acc_out);
 
     TFile *fout_ACC = new TFile(rootName_ACC, "RECREATE");
@@ -132,29 +151,39 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
 
 
 
-
-
     // ------------------------- EFF ------------------------- //
 
     // Quality cuts are already in RECO level tree
-    // just apply the FID region
+    // just apply the FID region & Selection cuts
     std::cout << "\n\n --- EFF calculation --- \n " << std::endl;
 
-    std::cout << "W/ quality + selection cuts: " <<  tree_reco->GetEntries(FIDreg_RECO) << " surviving SEL cuts" << std::endl;
+    // Selection cuts 
+    TString SELcuts = "Bnorm_svpvDistance_2D > 4";
+    if(treename == "ntmix"){SELcuts = "BQvalue<0.15 && Btrk1dR < 0.55 && Btrk2dR < 0.55";}
+
+    TString SelectionEFF = "(" + SELcuts + ")" ; // apply selection + fiducial cuts at reco level for EFF calculation
+    if (treename == "ntmix") {
+        TString RECO_isX = forX ? "(isX3872 == 1)" : "(isX3872 == 0)";
+        SelectionEFF = "(" + SelectionEFF + " && " + RECO_isX + ")";
+    }
+    std::cout << "EFF Selection cuts: " << SelectionEFF << "\n" << std::endl;
+    std::cout << "W/ quality + selection cuts: " <<  tree_reco->GetEntries(SelectionEFF) << " surviving SEL cuts" << std::endl;
 
     // 2D Histograms (DENOMINATOR is ACC 2D histogram ==> assume perfect gen-matching)
-    TH2D *hNum_EFF = new TH2D("hNum_EFF", ";p_{T} [GeV];|y|;numer", nPtBins, ptMin, ptMax, nYBins, yMin, yMax);
+    TH2D *hNum_EFF = new TH2D("hNum_EFF", ";p_{T} [GeV];|y|;numer", nPtBins, ptBins.data(), nYBins, yBins.data());
     hNum_EFF->Sumw2();
+    TH2D *hDen_EFF = (TH2D*)hNum_ACC->Clone("hDen_EFF"); // Denominator is the ACC histogram (gen-level)
+    hDen_EFF->SetTitle("Denominator for EFF; p_{T} [GeV];|y|;denom");
 
-    tree_reco->Draw("abs(By):Bpt>>hNum_EFF", FIDreg_RECO, "goff");  // Fill Numerator 
+    tree_reco->Draw("abs(By):Bpt>>hNum_EFF", SelectionEFF, "goff");  // Fill Numerator 
 
     // Compute ratio with binomial errors
     TH2D *hEFF = (TH2D*)hNum_EFF->Clone("hEFF");
     hEFF->SetTitle("Eff; p_{T} [GeV]; y; EFF fraction");
-    hEFF->Divide(hNum_EFF, hNum_ACC, 1.0, 1.0, "B");
+    hEFF->Divide(hNum_EFF, hDen_EFF, 1.0, 1.0, "B");
 
     // Style and draw
-    gStyle->SetOptStat(0)  ;
+//    gStyle->SetOptStat(0)  ;
     TCanvas *cEFF = new TCanvas("cEFF", "EFF Ratio 2D", 900, 700);
     cEFF->SetRightMargin(0.15);
     hEFF->SetMinimum(0.0);
@@ -163,16 +192,25 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     hEFF->Draw("COLZ")  ;
 
     // Save outputs
-    TString Eff_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_EFF.pdf";
-    TString rootName_EFF = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_EFF.root";
+    TString Eff_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_EFF" + suffix + ".pdf";
+    TString rootName_EFF = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_EFF" + suffix + ".root";
     cEFF->SaveAs(Eff_out);
 
     TFile *fout_EFF = new TFile(rootName_EFF, "RECREATE");
-    hDen_ACC->Write();
-    hNum_ACC->Write();
-    hACC->Write();
+    hDen_EFF->Write();
+    hNum_EFF->Write();
+    hEFF->Write();
     cEFF->Write();
     fout_EFF->Close();
+
+
+
+
+
+
+
+
+
 
     // ------------------------- ACC x EFF ------------------------- //
     TH2D *hACCxEFF = (TH2D*)hACC->Clone("hACCxEFF");
@@ -186,8 +224,8 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     hACCxEFF->SetContour(50);
     hACCxEFF->Draw("COLZ");
 
-    TString AccEff_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_ACCxEFF.pdf";
-    TString rootName_AccEff = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_ACCxEFF.root";
+    TString AccEff_out  = "output/" + treename + "_" + SYSTEM + "2Dmap_ACCxEFF" + suffix + ".pdf";
+    TString rootName_AccEff = "output/ROOTs/" + treename + "_" + SYSTEM + "2Dmap_ACCxEFF" + suffix + ".root";
     cACCxEFF->SaveAs(AccEff_out);
 
     TFile *fout_AccEff = new TFile(rootName_AccEff, "RECREATE");
@@ -196,7 +234,5 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef")
     fout_AccEff->Close();
 
     fin->Close();
-
-    
 
 }

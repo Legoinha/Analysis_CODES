@@ -15,11 +15,11 @@
 //   root -l -b -q 'plot2D_dataMC.C("Bmass","Bnorm_svpvDistance_2D","ntphi","ppRef",100,0,6,100,0,15)'
 
 
-void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
+void plot2D_dataMC(TString TREE = "ntKstar", TString systemNAME = "ppRef")
 {
-    // Variables list and ranges (per variable) — order matters
-    static const char* variables[] = {"Bmass", "Balpha", "BQvalue", "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2cl", "Btrk1dR", "Btrk1Pt", "Bnorm_svpvDistance_2D", "Bnorm_trk1Dxy"};
-    static const double ranges[][2] = {{3.6 , 4}, {0,3.15}, {0,1}, {0,1.5}, {0.9,1},                {0,0.9}, {0.05,1}, {0,1}, {0.5,5}, {0,15}, {-11,11}};
+    // Variables list and ranges (per variable) — order matters                                                 #{1.004,1.035}
+    static const char* variables[]  = {  "BtrkminPt", "Bmass", "Btktkpt", "Bujmass",  "Bpt", "abs(By)", "Balpha", "BQvalue",      "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2cl", "Btrk1dR", "Btrk1Pt","Btrk2Pt", "Bnorm_svpvDistance_2D", "Bnorm_trk1Dxy"};
+    static const double ranges[][2] = {       {0.5,4},   {5 , 6},    {0,15}, {2.9,3.25}, {0, 50},   {0, 2.4}, {0, 3.15},     {0.5,1.5}, {0.75,1.05}, {0.995,1},                {0,0.9}, {0.05,1}, {0,1}, {0.5,5},{0.5,5}, {0,15}, {-11,11} };
     int nVars = sizeof(variables)/sizeof(variables[0]);
 
     auto axisLabel = [&](const TString &var)->TString{
@@ -30,6 +30,7 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
             else if (TREE == "ntmix")  return "m_{J/#Psi #pi^{+} #pi^{-}} [GeV/c^{2}]";
         }
         if (var == "Bpt") return "p_{T} [GeV/c]";
+        if (var == "abs(By)") return "|y|";
         return var;
     };
 
@@ -48,18 +49,26 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
             chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");
             path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MC.root";
         } else if (TREE == "ntphi") {
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA.root");
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA_noFID.root");
             path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/MC_Bs.root";
+        }
+        else if (TREE == "ntKp") {
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/MC_Bu.root";
+        }
+        else if (TREE == "ntKstar") {
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_MC.root";
         }
     }
 
     TFile *fmc = TFile::Open(path_to_MC.Data());
-    fmc->GetObject(TREE.Data(), tree_MC);
+    fmc->GetObject(TREE.Data(), tree_MC); //TREE.Data()
 
     std::cout << "[plot2D] DATA entries: " << chain.GetEntries() << std::endl;
     std::cout << "[plot2D] MC   entries: " << tree_MC->GetEntries() << std::endl;
 
-    TString ANYsel = "1"; // customize if needed
+    TString ANYsel = "Bnorm_svpvDistance_2D > 4"; // customize if needed
 
     // Prepare output directory
     TString FOLDER_path = "./2Dplots";
@@ -101,7 +110,7 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
             int nbinsX = 100, nbinsY = 100;
 
             if (TREE == "ntmix") {
-                /*
+                
                 // MC signal: X(3872)
                 TH2F *h2_sig = new TH2F(Form("h2_sig_%d_%d", i, j), "", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
                 tree_MC->Draw(Form("%s:%s>>%s", varY.Data(), varX.Data(), h2_sig->GetName()), Form("%s && isX3872==1", ANYsel.Data()), "goff");
@@ -110,7 +119,7 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
                 h2_sig->Draw("COLZ");
                 c->SaveAs(Form("./2Dplots/%s_%s__%s_VS_%s__MC_X3872.pdf", TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
                 delete h2_sig;
-
+                /*
                 // MC specific background: Psi(2S)
                 TH2F *h2_spec = new TH2F(Form("h2_spec_%d_%d", i, j), "", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
                 tree_MC->Draw(Form("%s:%s>>%s", varY.Data(), varX.Data(), h2_spec->GetName()), Form("%s && isX3872==0", ANYsel.Data()), "goff");
@@ -119,7 +128,7 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
                 h2_spec->Draw("COLZ");
                 c->SaveAs(Form("./2Dplots/%s_%s__%s_VS_%s__MC_Psi2S.pdf", TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
                 delete h2_spec;
-                */
+                
                 // DATA (no sideband to keep simple)
                 TH2F *h2_data = new TH2F(Form("h2_data_%d_%d", i, j), "", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
                 chain.Draw(Form("%s:%s>>%s", varY.Data(), varX.Data(), h2_data->GetName()), ANYsel.Data(), "goff");
@@ -128,7 +137,9 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
                 h2_data->Draw("COLZ");
                 c->SaveAs(Form("./2Dplots/%s_%s__%s_VS_%s__DATA.pdf", TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
                 delete h2_data;
+                */
             } else {
+
                 // Generic MC 2D
                 TH2F *h2_mc = new TH2F(Form("h2_mc_%d_%d", i, j), "", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
                 tree_MC->Draw(Form("%s:%s>>%s", varY.Data(), varX.Data(), h2_mc->GetName()), ANYsel.Data(), "goff");
@@ -136,6 +147,7 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
                 h2_mc->GetYaxis()->SetTitle(axisLabel(varY));
                 h2_mc->Draw("COLZ");
                 c->SaveAs(Form("./2Dplots/%s_%s__%s_VS_%s__MC.pdf", TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
+                delete h2_mc;
 
                 // DATA
                 TH2F *h2_data = new TH2F(Form("h2_data_%d_%d", i, j), "", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
@@ -143,11 +155,12 @@ void plot2D_dataMC(TString TREE = "ntmix", TString systemNAME = "ppRef")
                 h2_data->GetXaxis()->SetTitle(axisLabel(varX));
                 h2_data->GetYaxis()->SetTitle(axisLabel(varY));
                 h2_data->Draw("COLZ");
-                c->SaveAs(Form("./2Dplots/%s_%s__%s_VS_%s__DATA.pdf", TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
-                delete h2_mc; delete h2_data;
+                c->SaveAs(Form("./2Dplots/%s/%s_%s__%s_VS_%s__DATA.pdf",TREE.Data(), TREE.Data(), systemNAME.Data(), varY.Data(), varX.Data()));
+                delete h2_data;
             }
         }
     }
+
 
     delete c;
     fmc->Close();

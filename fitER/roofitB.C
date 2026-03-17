@@ -9,7 +9,7 @@
 #include <TGraph.h>
 #include <stdio.h>
 
-#include "../plotER/aux/parameters.h"  
+#include "../plotER/aux/parameters.h"   //
 
 void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString treeName, TString sample, TString system="ppRef", TString DOselCUTS="1");
 std::pair<int, std::vector<double>> defineBinning(const TString& var, const TString& tree, int full);
@@ -20,7 +20,7 @@ int syst_study=0;
 // VALIDATION STUDIES
 int val=0;
 
-void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString outputfile = "", TString OUTPLOTF = "", TString ExtraMCsample = "", TString SYSTEM = "ppRef"){
+void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString OUTPLOTF = "", TString ExtraMCsample = "", TString SYSTEM = "ppRef"){
 
 	//Setup the working area
 	gSystem->mkdir(Form("./%s/validation",OUTPLOTF.Data()),true); 
@@ -86,7 +86,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		cout << "X3872 sig MC entries: " << mc->sumEntries("isX3872") << "\n";
 		cout << "PSI2S sig MC entries: " << mc->sumEntries("!isX3872") << "\n";
 	}
-	else{cout << "Total   MC entries: " << mc->sumEntries() << "\n";}
+	else{ cout << "Total   MC entries: " << mc->sumEntries() << "\n"; }
 	//DATA and MC SAMPLES
 
 	//MODELS for syst studies
@@ -121,14 +121,17 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	// FIT INFO
 
 	TH1D* hPt = new TH1D("hPt","",_nBins,_varBINS.data());  
+	TH1D* hPt_2S = new TH1D("hPt_2S","",_nBins,_varBINS.data());
+	TH1D* hPtMC = new TH1D("hPtMC","",_nBins,_varBINS.data());
+	TH1D* hPtMC_2S = new TH1D("hPtMC_2S","",_nBins,_varBINS.data());
 
 	//Fit the J/psi pi MC sample (shapes of J/psi pi peak is determined inclusively)
-	if(TREE=="ntKp"){
+	if(TREE=="ntKp" && false){
 
 		//PDF MODELS PDF MODELS PDF MODELS
 		//inclusive MC jpsipi Model
 		RooRealVar* m_jpsipi_fraction2 = 0;
-		RooRealVar* m_jpsipi_mean1 = 0;
+		RooRealVar* m_jpsipi_mean1   = 0;
 		RooRealVar* m_jpsipi_sigma1l = 0;
 		RooRealVar* m_jpsipi_sigma1r = 0;
 		m_jpsipi_fraction2 = new RooRealVar("m_jpsipi_fraction2","m_jpsipi_fraction2",0.4,0.0,0.8);
@@ -197,7 +200,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		else if(VAR == "nMult"){var_mean_av[i] = ith_DATA_bin->mean(*nMult);}
 		
 		// for the bin range in the histograms
-		hori_av_low[i] = var_mean_av[i]-_varBINS[i];
+		hori_av_low[i]  = var_mean_av[i]-_varBINS[i];
 		hori_av_high[i] = _varBINS[i+1]-var_mean_av[i];
 
 		////////// FITFITFITFITFITFITFITFITFITFITFITFIT //////////
@@ -213,6 +216,8 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		// Yield
 		RooRealVar* bkgYield = static_cast<RooRealVar*>(f_results->floatParsFinal().at(f_results->floatParsFinal().index(Form("nbkg%d_%s",_count,""))));
 		RooRealVar* fitYield = static_cast<RooRealVar*>(f_results->floatParsFinal().at(f_results->floatParsFinal().index(Form("nsig%d_%s",_count,""))));
+		RooRealVar* fitYield_2S = nullptr;
+
 		yield_vec[i]=fitYield->getVal();
 		yield_Stat_unc[i] = fitYield->getError();	
 		vector<double> stat_un;
@@ -245,16 +250,25 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		RooAbsPdf* modelMC = (RooAbsPdf*)ws->pdf(Form("modelMC%d_%s",_count,""));
 		RooChi2Var chi2MC(Form("chi2MC%d",_count),"chi2MC",*modelMC,*dhMC);
 		RooRealVar * fMC_params = new RooRealVar("fMC_params", "", ws->var(Form("ndfMC_%d_%s", _count, ""))->getVal() );
-		chi2MC_vec[i] = chi2MC.getVal()/(nbinsmasshisto - fMC_params->getVal()); //normalised chi square
+		chi2MC_vec[i] = chi2MC.getVal()/(nbinsmasshisto - fMC_params->getVal());              //normalised chi square
 		// Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results 
 
-		//////////////////////////// FILL HISTOGRAMS
-		
+		//////////////////////////// FILL YIELD HISTOGRAMS
 		hPt->SetBinContent(i+1,yield_vec[i]/b_width);
 		hPt->SetBinError(i+1,yield_Stat_unc[i]/b_width);
-    	hPt->GetXaxis()->SetBinLabel(i+1, Form("%f_results", var_mean_av[i]));
-
-		//////////////////////////// FILL HISTOGRAMS
+    	hPt->GetXaxis()->SetBinLabel(i+1, Form("%.2f", var_mean_av[i]));
+		hPtMC->SetBinContent(i+1,ws->var(Form("nsigMC%d_%s",_count,""))->getVal()/b_width);
+		hPtMC->SetBinError(i+1,ws->var(Form("nsigMC%d_%s",_count,""))->getError()/b_width);
+		hPtMC->GetXaxis()->SetBinLabel(i+1, Form("%.2f", var_mean_av[i]));
+		if (TREE == "ntmix") {
+			hPt_2S->SetBinContent(i+1,static_cast<RooRealVar*>(f_results->floatParsFinal().at(f_results->floatParsFinal().index(Form("nsig_spec%d_%s",_count,""))))->getVal()  /b_width);
+			hPt_2S->SetBinError(i+1  ,static_cast<RooRealVar*>(f_results->floatParsFinal().at(f_results->floatParsFinal().index(Form("nsig_spec%d_%s",_count,""))))->getError()/b_width);
+			hPt_2S->GetXaxis()->SetBinLabel(i+1, Form("%.2f", var_mean_av[i]));
+			hPtMC_2S->SetBinContent(i+1,ws->var(Form("nsig_specMC%d_%s",_count,""))->getVal()/b_width);
+			hPtMC_2S->SetBinError(i+1,ws->var(Form("nsig_specMC%d_%s",_count,""))->getError()/b_width);
+			hPtMC_2S->GetXaxis()->SetBinLabel(i+1, Form("%.2f", var_mean_av[i]));
+		}
+		//////////////////////////// FILL YIELD HISTOGRAMS
 
 		////////////////////////////////////////////////////////// LABELS IN PLOTS
 	  	
@@ -428,9 +442,14 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	//BIN ANALYSIS END
 	//BIN ANALYSIS END
 	
-	TFile* outf = new TFile(Form("%s.root",outputfile.Data()),"recreate");
+	TFile* outf = new TFile(Form("ROOTfiles/yields_%s_%s_%s.root",TREE.Data(),VAR.Data(), SYSTEM.Data()),"recreate");
 	outf->cd();
 	hPt->Write();	
+	hPtMC->Write();
+	if (TREE == "ntmix"){
+		hPt_2S->Write();
+		hPtMC_2S->Write();
+	}
 	outf->Close();
 
 	if(syst_study==1 && FULL==0){
@@ -570,8 +589,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		else if(VAR == "Bpt"){
 			m_back_sig->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			m_back_sig->GetYaxis()->SetTitle("dY_{S}/dp_{T}");
-			if (TREE == "ntKp"){ m_back_sig->GetXaxis()->SetLimits(0 ,65); }
-			if (TREE == "ntphi"){ m_back_sig->GetXaxis()->SetLimits(0 ,65); }
+			if (TREE != "ntmix"){ m_back_sig->GetXaxis()->SetLimits(0 ,65); }
 		}
 		else if(VAR == "nMult"){
 			m_back_sig->GetXaxis()->SetTitle("Multiplicity (Mult)");
@@ -843,19 +861,14 @@ void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString
 	TTree* tIn = (TTree*) fin->Get(treeName);
 	//std::cout << "Tree entries: " << tIn->GetEntries() << std::endl;
 
-	TString fullCut = Form("((Bpt < 10 && abs(By) > 1.5) || (Bpt > 10))" // Fid region
-						"&& (%s)"
-						"&& (Bmass > %f) && (Bmass < %f)",
-						DOselCUTS.Data(), // defined in .sh file (for each particle)
-						minhisto, maxhisto);
+	TString fullCut = Form("(%s) && (Bmass > %f) && (Bmass < %f)", DOselCUTS.Data(), minhisto, maxhisto);
 
 	TDirectory* savedDir = gDirectory;
 	gROOT->cd();                 
 	TTree* t1 = tIn->CopyTree(fullCut);
 	savedDir->cd();              
 
-	if(true){
-		// Create a canvas to draw the mass histogram
+	if(true){ // Create a canvas to draw the mass histogram
         TCanvas *canvas = new TCanvas("canvas", "Bmass Distribution", 600, 600);
         canvas->SetLeftMargin(0.15); // or try 0.18 for more space
 

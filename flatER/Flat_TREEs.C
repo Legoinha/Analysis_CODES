@@ -6,62 +6,78 @@
 #include <cmath>
 #include "../plotER/aux/masses.h"
 
-void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = true, bool Selection=false)
+void Flat_TREEs(TString treename="ntKstar", TString P_vs_NP="prompt", TString SYSTEM="ppRef", bool isMC = false)
 {
+
+    bool Fid_region  = true;  // apply fiducial region selection
+    bool PreSel_cuts = true;  // apply quality cuts (+ pre-selection)
+    bool Selection   = false;
+    TString specCASES = "B0_small";    // for extra naming in output file (e.g. to distinguish different selection cuts)
+    if (treename == "ntmix" && isMC && P_vs_NP == "NP") { specCASES = "_nonPrompt";}
+
     std::cout << "Flattening tree: " << treename << " , System: " << SYSTEM << " , isMC: " << isMC << std::endl;
     bool isPP     = (SYSTEM == "ppRef");
     bool isPbPb23 = (SYSTEM == "PbPb23");
     bool isPbPb24 = (SYSTEM == "PbPb24");
     bool isPbPb25 = (SYSTEM == "PbPb25");
-    bool isPbPb   = isPbPb23 || isPbPb24 || isPbPb25;
-    if (!(isPP || isPbPb)){
-        std::cout << "Unknown SYSTEM: ABORT" << std::endl;
-        return;
-    }
+    bool isPbPb   = (isPbPb23 || isPbPb24 || isPbPb25);
 
     // --------------------------------------------------
     // Input files using TChain
     // --------------------------------------------------
     TChain *tin = new TChain("Bfinder/" + treename);
     
-    if(isPP){
-        if (isMC){ // MC ppRef
+    if(isPP){ // MC ppRef
+        if (isMC){ 
             if (treename == "ntmix"){
-                tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/250830_222956/0000/*.root");   //X3872
-                tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/250830_223048/0000/*.root");   //X3872
+                if (P_vs_NP == "NP"){
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/nonprompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260226_100453/0000/*.root");   //PSI2S (non-prompt, small)
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/nonprompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260225_232446/0000/*.root");    //X3872 (non-prompt, small)
+                }
+                else {
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260228_194148/0000/*.root");    //X3872 (small)
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260228_194229/0000/*.root");   //PSI2S (small)
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260228_181540/0000/*.root");    //X3872 (large)
+                    tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260228_181719/0000/*.root");   //PSI2S (large)
+                }
             }
-            else if (treename == "ntphi"){ //B0s
-                tin->Add("");  
+            else if (treename == "ntphi"){    //B0s
+                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bsubs_to_JPsiPHI_pthat10/260224_023406/0000/*.root");  
             }
-            else if (treename == "ntKp"){  //B+
-                tin->Add("");  
+            else if (treename == "ntKstar"){  //B0
+                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bzero_to_JpsiKstar_pthat10/260224_023043/0000/*.root");  
+            }
+            else if (treename == "ntKp"){     //B+
+                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bplus_to_JPsiK_pthat10/260224_125939/0000/*.root");  
             }
         }
         else{ // DATA ppRef
-            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon0/PPRefDoubleMuon0/260117_013527/0000/*"); //
-            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon1/PPRefDoubleMuon1/260117_013532/0000/*"); //
-            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260117_013537/0000/*"); //
-            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon3/PPRefDoubleMuon3/260117_013542/0000/*"); //
+            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon0/PPRefDoubleMuon0/260225_125246/0000/*"); 
+            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon1/PPRefDoubleMuon1/260225_125254/0000/*"); 
+            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260225_125302/0000/*");  
+            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon3/PPRefDoubleMuon3/260225_125311/0000/*"); 
+            tin->Add("/eos/user/h/hmarques/X3872/CMSSW_14_1_8/src/HiForestMINIAOD_ppRefData_noCUT.root");  //SMALL SAMPLE W/ B0 only
         }
     }
     else if(isPbPb23){
          if(isMC){
-            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/250901_215605/0000/*.root");
-            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/250901_215723/0000/*.root");}    
+            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/            ");
+            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/           ");
+        }    
     }
-    //else if(isPbPb24){tin->Add("/path/to/PbPb24/data/*/*/*/*.root");}
 
-    std::cout << "Total files added: " << tin->GetNtrees() << std::endl;
+    
+    std::cout << "Total files added: "      << tin->GetNtrees() << std::endl;
     std::cout << "Total entries in chain: " << tin->GetEntries() << std::endl;
 
     // --------------------------------------------------
     // Output file
     // --------------------------------------------------
-    TString datatype = "";
+    TString datatype  = "";
     if(isMC){datatype = "MC";}
     else    {datatype = "DATA";}
 
-    TString outputFile = "flat_" + treename + "_" + SYSTEM + "_" + datatype + "wGenInfo.root";
+    TString outputFile = "flat_" + treename + "_" + SYSTEM + "_" + datatype + specCASES + ".root";  //
     TFile *fout = new TFile(outputFile, "RECREATE");
     TTree *tout = new TTree(treename, "Flattened tree");
 
@@ -109,7 +125,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     Float_t Btktkmass[MAXCAND];
     Float_t Bujmass[MAXCAND];
     Float_t BujvProb[MAXCAND];
-    Float_t Bchi2cl[MAXCAND];
+    Float_t Bchi2Prob[MAXCAND];
     Float_t BtrkPtimb[MAXCAND];
     Float_t Btrk1dR[MAXCAND];
     Float_t Btrk2dR[MAXCAND];
@@ -127,6 +143,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     Float_t Btrk1nStripLayer[MAXCAND];
     Float_t Btrk2nPixelLayer[MAXCAND];  
     Float_t Btrk2nStripLayer[MAXCAND];
+    Float_t BLxy[MAXCAND];
 
     tin->SetBranchAddress("Bsize", &Bsize);
     tin->SetBranchAddress("nSelectedChargedTracks", &nSelectedChargedTracks);
@@ -156,7 +173,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     tin->SetBranchAddress("Btktkmass", Btktkmass);
     tin->SetBranchAddress("Bujmass", Bujmass);
     tin->SetBranchAddress("BujvProb", BujvProb);
-    tin->SetBranchAddress("Bchi2cl", Bchi2cl);
+    tin->SetBranchAddress("Bchi2Prob", Bchi2Prob);
     tin->SetBranchAddress("BtrkPtimb", BtrkPtimb);
     tin->SetBranchAddress("Btrk1dR", Btrk1dR);
     tin->SetBranchAddress("Btrk2dR", Btrk2dR);
@@ -174,13 +191,13 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     tin->SetBranchAddress("Btrk1nStripLayer", Btrk1nStripLayer);
     tin->SetBranchAddress("Btrk2nPixelLayer", Btrk2nPixelLayer);  
     tin->SetBranchAddress("Btrk2nStripLayer", Btrk2nStripLayer);
-
+    tin->SetBranchAddress("BLxy", BLxy);
     // --------------------------------------------------
     // Output branches (for Selection // Analysis)
     // --------------------------------------------------
-    float Bmass_out, Bpt_out, By_out, Bchi2cl_out, Btrk1dR_out, Btrk2dR_out, BtrkPtimb_out, Btktkpt_out, Bujmass_out, Bnorm_svpvDistance_2D_out;
+    float Bmass_out, Bpt_out, By_out, Bchi2Prob_out, Btrk1dR_out, Btrk2dR_out, BtrkPtimb_out, Btktkpt_out, Bujmass_out, Bnorm_svpvDistance_2D_out;
     float BQvalue_out, Bnorm_trk1Dxy_out, Bnorm_trk2Dxy_out, Balpha_out, Bdtheta_out, Bcos_dtheta_out, Btktkmass_out, Btrk1Pt_out, Btrk2Pt_out;
-    float Bgen_out, BsvpvDistance_2D_out;
+    float Bgen_out, BsvpvDistance_2D_out, BtktkvProb_out, BLxy_out;
     int CentBin_out, nSelectedChargedTracks_out;
     Bool_t isX3872_out;
 
@@ -189,7 +206,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     tout->Branch("Bmass", &Bmass_out, "Bmass/F");
     tout->Branch("Bpt", &Bpt_out, "Bpt/F");
     tout->Branch("By", &By_out, "By/F");
-    tout->Branch("Bchi2cl", &Bchi2cl_out, "Bchi2cl/F");
+    tout->Branch("Bchi2Prob", &Bchi2Prob_out, "Bchi2Prob/F");
     tout->Branch("Btrk1dR", &Btrk1dR_out, "Btrk1dR/F");
     tout->Branch("Btrk2dR", &Btrk2dR_out, "Btrk2dR/F");
     tout->Branch("BtrkPtimb", &BtrkPtimb_out, "BtrkPtimb/F");
@@ -206,11 +223,12 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
     tout->Branch("Btktkmass", &Btktkmass_out, "Btktkmass/F");
     tout->Branch("Btrk1Pt", &Btrk1Pt_out, "Btrk1Pt/F");
     tout->Branch("Btrk2Pt", &Btrk2Pt_out, "Btrk2Pt/F");
+    tout->Branch("BtktkvProb", &BtktkvProb_out, "BtktkvProb/F");
+    tout->Branch("BLxy", &BLxy_out, "BLxy/F");
     if (isMC){
         tout->Branch("Bgen", &Bgen_out, "Bgen/F");
         if (treename == "ntmix") tout->Branch("isX3872", &isX3872_out, "isX3872/O");
     }
-
 
     // --------------------------------------------------
     // Event loop
@@ -228,7 +246,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
 
         // identify source by filename
         TString fname = tin->GetCurrentFile()->GetName();
-        isX3872_out = fname.Contains("prompt_X3872_to_") ? 1 : 0;
+        isX3872_out = fname.Contains("X3872_") ? 1 : 0;
     
         // Event-level variables
         CentBin_out = CentBin;
@@ -242,7 +260,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
             // Pre-Selection (quality) Cuts
             // DATA is already filtered (except for the cuts marked with <-------- ** ); 
             // MC is not.
-            if (true){
+            if (PreSel_cuts){
                 // Muons
                 // Muon Trigger matching   <-------- **
                 if(isPP && !(Bmu1isTriggered[i] && Bmu2isTriggered[i] )) continue;
@@ -272,17 +290,24 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
                     if(((Btrk2Chi2ndf[i]/(Btrk2nPixelLayer[i] + Btrk2nStripLayer[i])) >= 0.18)) continue;
                     if(!Btrk2highPurity[i]) continue;
                     //diTrack system
-                    if (treename == "ntphi"   && !(abs(Btktkmass[i]-PHI_MASS)  <0.015)) continue;
-                    if (treename == "ntKstar" && !(abs(Btktkmass[i]-KSTAR_MASS)<0.15)) continue;
+                    //if (treename == "ntphi"   && !(abs(Btktkmass[i] - PHI_MASS)  <0.015)) continue;
+                    //if (treename == "ntKstar" && !(abs(Btktkmass[i] - KSTAR_MASS)<0.150)) continue;
                 }
 
                 // Candidate
-                if(Bchi2cl[i] < 0.005) continue;
+                if(Bchi2Prob[i] < 0.005) continue;
                 if(treename == "ntmix" && Bpt[i]<4) continue; 
                 else if (Bpt[i]<1) continue;
             }
 
-            // Selection Cuts
+            // Fiducial Region
+            if (Fid_region){
+                if ( ( (Bpt[i] < 5) && abs(By[i]) > 2.4) ) continue; 
+                if ( (treename != "ntmix") && !( (Bpt[i] < 10  && abs(By[i]) > 1.5) || (Bpt[i] > 10  && Bpt[i] < 50) ) ) continue;
+                if ( (treename == "ntmix") && !( (Bpt[i] < 7.5 && abs(By[i]) > 1.4) || (Bpt[i] > 7.5 && Bpt[i] < 50) ) ) continue;
+            }
+
+            // Selection cuts (for analysis)
             if (Selection){
             }
 
@@ -293,7 +318,7 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
             Bmass_out   = Bmass[i];
             Bpt_out     = Bpt[i];
             By_out      = By[i];
-            Bchi2cl_out = Bchi2cl[i];
+            Bchi2Prob_out = Bchi2Prob[i];
             Btrk1dR_out = Btrk1dR[i];
             Btrk2dR_out = Btrk2dR[i];
             BtrkPtimb_out = BtrkPtimb[i];
@@ -305,19 +330,19 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
             Bnorm_trk1Dxy_out = Bnorm_trk1Dxy[i];
             Bnorm_trk2Dxy_out = Bnorm_trk2Dxy[i];
             Balpha_out  = Balpha[i];
+            BtktkvProb_out = BtktkvProb[i];
             Bdtheta_out = Bdtheta[i];
             Bcos_dtheta_out = Bcos_dtheta[i];
             Btktkmass_out = Btktkmass[i];
             Btrk1Pt_out   = Btrk1Pt[i];
             Btrk2Pt_out   = Btrk2Pt[i];
+            BLxy_out      = BLxy[i];
 
             if(!std::isfinite(Bmass_out) || !std::isfinite(Bpt_out) || !std::isfinite(By_out) || !std::isfinite(Bnorm_trk1Dxy_out) ||
-            !std::isfinite(CentBin_out) || !std::isfinite(Bchi2cl_out) || !std::isfinite(Btrk1dR_out) || !std::isfinite(Bnorm_svpvDistance_2D_out)) continue;
+            !std::isfinite(CentBin_out) || !std::isfinite(Bchi2Prob_out) || !std::isfinite(Btrk1dR_out) || !std::isfinite(Bnorm_svpvDistance_2D_out)) continue;
             tout->Fill();
         }
     }
-
-
 
     // --------------------------------------------------
     // Copy ntGen tree (flat, one row per candidate in mass window)
@@ -339,7 +364,6 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
         Float_t Gpt[MAXCAND];
         Float_t Gy[MAXCAND];
         Int_t GisSignal[MAXCAND];
-        
 
         tgen->SetBranchAddress("Gsize", &Gsize);
         tgen->SetBranchAddress("GisSignal", GisSignal);
@@ -376,32 +400,41 @@ void Flat_TREEs(TString treename="ntmix", TString SYSTEM="ppRef", bool isMC = tr
         for (Long64_t ev=0; ev<ngen; ++ev) {
             tgen->GetEntry(ev);
             for (int i=0; i<Gsize; ++i) {
-                if (GisSignal[i] != 7) continue;  // keep only X(3872), both prompt and non-prompt
 
-                GpdgId_out = GpdgId[i];
+                if (treename == "ntmix" && GisSignal[i] != 7) continue;              // keep only X(3872), both prompt and non-prompt
+                else if (treename == "ntphi"   && abs(GpdgId[i]) != 531) continue;  
+                else if (treename == "ntKstar" && abs(GpdgId[i]) != 511) continue;  
+                else if (treename == "ntKp"    && abs(GpdgId[i]) != 521) continue;
+
+                // Fiducial Region
+                if (Fid_region){
+                    if ( !( (Gpt[i] > 5) && abs(Gy[i]) < 2.4) ) continue; 
+                    if ( (treename != "ntmix") && !( (Gpt[i] < 10  && abs(Gy[i]) > 1.5) || (Gpt[i] > 10  && Gpt[i] < 50) ) ) continue;
+                    if ( (treename == "ntmix") && !( (Gpt[i] < 7.5 && abs(Gy[i]) > 1.4) || (Gpt[i] > 7.5 && Gpt[i] < 50) ) ) continue;
+                }
+
+                GpdgId_out  = GpdgId[i];
                 Gmu1eta_out = Gmu1eta[i];
-                Gmu1pt_out = Gmu1pt[i];
+                Gmu1pt_out  = Gmu1pt[i];
                 Gmu2eta_out = Gmu2eta[i];
-                Gmu2pt_out = Gmu2pt[i];
-                Gtk1pt_out = Gtk1pt[i];
+                Gmu2pt_out  = Gmu2pt[i];
+                Gtk1pt_out  = Gtk1pt[i];
                 Gtk1eta_out = Gtk1eta[i];
-                Gtk2pt_out = Gtk2pt[i];
+                Gtk2pt_out  = Gtk2pt[i];
                 Gtk2eta_out = Gtk2eta[i];
                 Gpt_out = Gpt[i];
-                Gy_out = Gy[i];
-
+                Gy_out  = Gy[i];
                 tgenOut->Fill();
+
             }
         }
     }
 
     std::cout << "Output tree has " << tout->GetEntries() << " entries" << std::endl;
-    
     // Write trees (only two top-level trees)
     tout->Write();
     if (isMC && tgenOut) tgenOut->Write();
     fout->Close();
     delete tin;
-
     std::cout << "Done & Saved -> " << outputFile << "\n";
 }
