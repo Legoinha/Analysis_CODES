@@ -6,13 +6,13 @@
 #include <cmath>
 #include "../plotER/aux/masses.h"
 
-void Flat_TREEs(TString treename="ntKstar", TString P_vs_NP="prompt", TString SYSTEM="ppRef", bool isMC = false)
+void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="PbPb23", bool isMC = true)
 {
 
     bool Fid_region  = true;  // apply fiducial region selection
     bool PreSel_cuts = true;  // apply quality cuts (+ pre-selection)
     bool Selection   = false;
-    TString specCASES = "B0_small";    // for extra naming in output file (e.g. to distinguish different selection cuts)
+    TString specCASES = "";    // for extra naming in output file (e.g. to distinguish different selection cuts)
     if (treename == "ntmix" && isMC && P_vs_NP == "NP") { specCASES = "_nonPrompt";}
 
     std::cout << "Flattening tree: " << treename << " , System: " << SYSTEM << " , isMC: " << isMC << std::endl;
@@ -41,32 +41,25 @@ void Flat_TREEs(TString treename="ntKstar", TString P_vs_NP="prompt", TString SY
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260228_181719/0000/*.root");   //PSI2S (large)
                 }
             }
-            else if (treename == "ntphi"){    //B0s
-                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bsubs_to_JPsiPHI_pthat10/260224_023406/0000/*.root");  
-            }
-            else if (treename == "ntKstar"){  //B0
-                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bzero_to_JpsiKstar_pthat10/260224_023043/0000/*.root");  
-            }
-            else if (treename == "ntKp"){     //B+
-                tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bplus_to_JPsiK_pthat10/260224_125939/0000/*.root");  
-            }
+            else if (treename == "ntphi"){  tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bsubs_to_JPsiPHI_pthat10/260224_023406/0000/*.root");}
+            else if (treename == "ntKstar"){tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bzero_to_JpsiKstar_pthat10/260224_023043/0000/*.root");}
+            else if (treename == "ntKp"){   tin->Add("/eos/user/h/hmarques/MC_ppRef_Bmesons/MC_ppRef_X/Bplus_to_JPsiK_pthat10/260224_125939/0000/*.root");}
         }
         else{ // DATA ppRef
-            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon0/PPRefDoubleMuon0/260225_125246/0000/*"); 
-            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon1/PPRefDoubleMuon1/260225_125254/0000/*"); 
-            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260225_125302/0000/*");  
-            //tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon3/PPRefDoubleMuon3/260225_125311/0000/*"); 
-            tin->Add("/eos/user/h/hmarques/X3872/CMSSW_14_1_8/src/HiForestMINIAOD_ppRefData_noCUT.root");  //SMALL SAMPLE W/ B0 only
+            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon0/PPRefDoubleMuon0/260225_125246/0000/*"); 
+            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon1/PPRefDoubleMuon1/260225_125254/0000/*"); 
+            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260225_125302/0000/*");  
+            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon3/PPRefDoubleMuon3/260225_125311/0000/*"); 
         }
     }
     else if(isPbPb23){
          if(isMC){
-            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/            ");
-            tin->Add("/eos/user/h/hmarques/MC_PbPb_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/           ");
+            tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260322_030836/0000/*.root");      //X3872 (small)
+            tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260322_030701/0000/*.root");     //PSI2S (small)
         }    
+        else{}
     }
 
-    
     std::cout << "Total files added: "      << tin->GetNtrees() << std::endl;
     std::cout << "Total entries in chain: " << tin->GetEntries() << std::endl;
 

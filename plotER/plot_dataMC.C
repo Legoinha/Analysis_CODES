@@ -38,20 +38,20 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
     }
     else{ //ppRef system
         if (TREE == "ntmix"){      //X3872
-            chain.Add( "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");
-            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MC.root";
+            chain.Add( "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA.root");
+            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC.root";
         } 
         else if (TREE == "ntphi"){ //B0s
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA.root"); 
-            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_MC.root";
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_DATA.root"); 
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_MC.root";
         }
         else if (TREE == "ntKp"){  //B+
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root"); 
-            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_MC.root";
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKp_ppRef_DATA.root"); 
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKp_ppRef_MC.root";
         }
         else if (TREE == "ntKstar"){  //B0
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root"); 
-            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_MC.root";
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKstar_ppRef_DATA.root"); 
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKstar_ppRef_MC.root";
         }
     }
 
