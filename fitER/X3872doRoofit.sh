@@ -1,5 +1,5 @@
-DOANALYSISPbPb_FULL_X=0
-DOANALYSISPbPb_BINNED_PT_X=1
+DOANALYSISPbPb_FULL_X=1
+DOANALYSISPbPb_BINNED_PT_X=0
 DOANALYSISPbPb_BINNED_Y_X=0
 DOANALYSISPbPb_BINNED_MULT_X=0
 
@@ -9,8 +9,8 @@ syst="ppRef"
 
 
 #Data and MC Samples
-MC_X="./../flatER/flat_ntmix_ppRef_MC.root"
-Data_X="./../flatER/flat_ntmix_ppRef_DATA.root"    ###Rectandular cuts
+MC_X="./../flatER/X3872/flat_ntmix_ppRef_MC.root"
+Data_X="./../flatER/X3872/flat_ntmix_ppRef_DATA.root"    ###Rectandular cuts
 #Data_X="/eos/user/h/hmarques/Analysis_CODES/DATA_Signal_pp_BDT.root" ###From Prince ML
 #Data and MC Samples
 

@@ -10,14 +10,14 @@
 
 #include "aux/parameters.h"
 
-void plot_Data(TString TREE ="ntphi", TString systemNAME = "ppRef"){
+void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
     // Create a TChain and add all files from the directory
     TChain chain(Form("%s", TREE.Data()));
 
     if(systemNAME.Contains("PbPb")){//PbPb data
         chain.Add("/lstore/cms/hlegoinha/DATA_X3872_PbPb.root");
     } else {//ppRef data
-        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");}
+        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA.root");}
         else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");}
         else if (TREE == "ntphi"){  chain.Add("/eos/user/h/hmarques/Analysis_CODES/plotER/Data_Bs.root");}
         else if (TREE == "ntKstar"){chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root");}

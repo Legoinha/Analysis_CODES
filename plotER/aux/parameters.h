@@ -19,7 +19,7 @@ double maxhisto_X=4.0;
 
 ///FOR TESTING TESTING
 const int N_pt_Bins_X = 1;
-std::vector<double> ptbinsvec_X = {14, 15};
+std::vector<double> ptbinsvec_X = {5, 50};
 ///FOR TESTING TESTING
 
 const int N_pt_Bins_B = 5;

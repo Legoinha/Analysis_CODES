@@ -6,7 +6,7 @@
 #include <cmath>
 #include "../plotER/aux/masses.h"
 
-void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="PbPb23", bool isMC = true)
+void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="ppRef", bool isMC = true)
 {
 
     bool Fid_region  = true;  // apply fiducial region selection
