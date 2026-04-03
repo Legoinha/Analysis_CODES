@@ -48,19 +48,35 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
         else{ // DATA ppRef
             tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon0/PPRefDoubleMuon0/260225_125246/0000/*"); 
             tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon1/PPRefDoubleMuon1/260225_125254/0000/*"); 
-            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260225_125302/0000/*");  
+            tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon2/PPRefDoubleMuon2/260225_125302/0000/*"); 
             tin->Add("/eos/user/h/hmarques/PPRef2024/PPRefDoubleMuon3/PPRefDoubleMuon3/260225_125311/0000/*"); 
         }
     }
     else if(isPbPb23){
-         if(isMC){
-            //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260322_030836/0000/*.root");      //X3872 (small)
-            //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260322_030701/0000/*.root");     //PSI2S (small)
-            tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder_large/260331_100051/0000/*.root");      //X3872 (lip, large)
-            tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder_large/260331_095521/0000/*.root");     //PSI2S (lip, large)
-        
-        }    
-        else{}
+        if(isMC){
+            if(treename == "ntmix"){
+                //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260322_030836/0000/*.root");      //X3872 (small)
+                //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260322_030701/0000/*.root");     //PSI2S (small)
+                tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder_large/260331_100051/0000/*.root");      //X3872 (lip, large)
+                tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder_large/260331_095521/0000/*.root");     //PSI2S (lip, large)
+            }
+        }
+        else{
+            tin->Add("@data_pbpb_23.txt");       //(lip)
+        }
+    }
+    else if(isPbPb24){
+        if(isMC){
+            if(treename == "ntmix"){
+                tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb2024_prompt_X/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder_large_pbpb24/260402_105830/0000/*.root");      //X3872 (lip, large)
+                tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb2024_prompt_psi2S/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder_large_pbpb24/260402_114404/0000/*.root");     //PSI2S (lip, large)
+            }
+        }
+        else{
+
+        }
+
+
     }
 
     std::cout << "Total files added: "      << tin->GetNtrees() << std::endl;
