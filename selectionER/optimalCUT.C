@@ -3,7 +3,7 @@ void optimalCUT() {
     TString TREE = "tree"; // "ntmix", "ntKp", "ntKstar", "ntphi"
     // Input files 
     TString path_to_file = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/selected_events/bchi2prob_optuna5/DATA_with_score.root";
-    TString path_to_MC = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/selected_events/bchi2prob_optuna5/MC_with_score.root";
+    TString path_to_MC   = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/selected_events/bchi2prob_optuna5/MC_with_score.root";
 
 
     TFile *file_Data = TFile::Open(path_to_file.Data());

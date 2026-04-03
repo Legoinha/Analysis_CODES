@@ -6,14 +6,15 @@
 #include <cmath>
 #include "../plotER/aux/masses.h"
 
-void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="ppRef", bool isMC = true)
+void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="PbPb23", bool isMC = true)
 {
 
     bool Fid_region  = true;  // apply fiducial region selection
     bool PreSel_cuts = true;  // apply quality cuts (+ pre-selection)
-    bool Selection   = false;
+    bool KeepGenLv = true;     // whether to copy gen-level tree (ntGen) to output file (only for MC)
     TString specCASES = "";    // for extra naming in output file (e.g. to distinguish different selection cuts)
     if (treename == "ntmix" && isMC && P_vs_NP == "NP") { specCASES = "_nonPrompt";}
+    if (KeepGenLv == false) { specCASES = "_RECOonly";}
 
     std::cout << "Flattening tree: " << treename << " , System: " << SYSTEM << " , isMC: " << isMC << std::endl;
     bool isPP     = (SYSTEM == "ppRef");
@@ -33,8 +34,7 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
                 if (P_vs_NP == "NP"){
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/nonprompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260226_100453/0000/*.root");   //PSI2S (non-prompt, small)
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/nonprompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260225_232446/0000/*.root");    //X3872 (non-prompt, small)
-                }
-                else {
+                } else {
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260228_194148/0000/*.root");    //X3872 (small)
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260228_194229/0000/*.root");   //PSI2S (small)
                     tin->Add("/eos/user/h/hmarques/MC_ppRef_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260228_181540/0000/*.root");    //X3872 (large)
@@ -54,8 +54,11 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
     }
     else if(isPbPb23){
          if(isMC){
-            tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260322_030836/0000/*.root");      //X3872 (small)
-            tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260322_030701/0000/*.root");     //PSI2S (small)
+            //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder/260322_030836/0000/*.root");      //X3872 (small)
+            //tin->Add("/eos/user/h/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder/260322_030701/0000/*.root");     //PSI2S (small)
+            tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder_large/260331_100051/0000/*.root");      //X3872 (lip, large)
+            tin->Add("/gstore/t3cms/store/user/hmarques/MC_PbPb23_X3872/MC_PbPb_X3872/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder_large/260331_095521/0000/*.root");     //PSI2S (lip, large)
+        
         }    
         else{}
     }
@@ -300,10 +303,6 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
                 if ( (treename == "ntmix") && !( (Bpt[i] < 7.5 && abs(By[i]) > 1.4) || (Bpt[i] > 7.5 && Bpt[i] < 50) ) ) continue;
             }
 
-            // Selection cuts (for analysis)
-            if (Selection){
-            }
-
             // keep MC signal only
             Bgen_out = Bgen[i];
             if( isMC && !(Bgen_out==23333 || Bgen_out==24333 || Bgen_out==23433 || Bgen_out==24433 || Bgen_out==41000 )) continue;
@@ -340,7 +339,7 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
     // --------------------------------------------------
     // Copy ntGen tree (flat, one row per candidate in mass window)
     // --------------------------------------------------
-    if (isMC) {
+    if (isMC && KeepGenLv) {
         fout->cd();
 
         // Gen-level input branches
