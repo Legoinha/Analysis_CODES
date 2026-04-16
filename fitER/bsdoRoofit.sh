@@ -4,9 +4,8 @@ DOANALYSISPbPb_BINNED_Y_BS=0
 DOANALYSISPbPb_BINNED_MULT_BS=0
 
 #Data and MC Samples
-Data_Bs="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA.root"
-#MC_Bs="/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_MC.root"
-MC_Bs="/eos/user/h/hmarques/Analysis_CODES/MC_Bs.root"
+Data_Bs="/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_DATA.root"
+MC_Bs="/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_MC.root"
 #Data and MC Samples
 
 ## NEW CUTS ? here 

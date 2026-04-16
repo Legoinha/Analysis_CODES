@@ -1,23 +1,18 @@
 void optimalCUT() {
 
-    TString TREE = "tree"; // "ntmix", "ntKp", "ntKstar", "ntphi"
+    TString TREE = "ntmix"; // "ntmix", "ntKp", "ntKstar", "ntphi"
     // Input files 
-    TString path_to_file = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/selected_events/bchi2prob_optuna5/DATA_with_score.root";
-    TString path_to_MC   = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/selected_events/bchi2prob_optuna5/MC_with_score.root";
-
+    TString path_to_file = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root";
+    TString path_to_MC   = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore.root";
 
     TFile *file_Data = TFile::Open(path_to_file.Data());
     TFile *file_MC_X3872 = TFile::Open(path_to_MC.Data());
-    if (!file_Data || file_Data->IsZombie()) { std::cout<<"Cannot open data file"<<std::endl; return; }
-    if (!file_MC_X3872 || file_MC_X3872->IsZombie()) { std::cout<<"Cannot open MC file"<<std::endl; return; }
 
     // Get trees (expect name "TREE")
     TTree *tree_DATA  = nullptr;
     TTree *tree_X3872 = nullptr;
     file_Data->GetObject(TREE, tree_DATA);
     file_MC_X3872->GetObject(TREE, tree_X3872);
-    if (!tree_DATA) {std::cout << "Data tree " << TREE << " not found"<<std::endl; return;}
-    if (!tree_X3872){std::cout << "MC tree "   << TREE << " not found"<<std::endl; return;}
 
     TString cut = "BQvalue < 0.15"; // 
     //TString cut = "1"; // 
@@ -31,7 +26,7 @@ void optimalCUT() {
     double best_fom = -1.0;
 
     // Range and step for threshold scan
-    double thr_min = 0.4;
+    double thr_min = 0.0;
     double thr_max = 1;
     double step = 0.005;
 
@@ -48,7 +43,7 @@ void optimalCUT() {
 
     for (double thr = thr_min; thr <= thr_max + 1e-12; thr += step) {
         // Build selection strings
-        TString sel_mc = Form("%s && (xgb_score > %g)"  , cut.Data(), thr);
+        TString sel_mc = Form("isX3872 == 1 && %s && (xgb_score > %g)", cut.Data(), thr);
         TString sel_data = Form("%s && %s && (xgb_score > %g)", sb_def.Data(), cut.Data(), thr);
 
         // Count MC signal events (S_mc)
@@ -61,13 +56,13 @@ void optimalCUT() {
 
         double S_mc = static_cast<double>(nS);
         double B_sb = static_cast<double>(nB)/2;
+        double fom = 0.0;
+        double num =  2250.0/62847.0 * S_mc;
+        double den = (2250.0/62847.0 * S_mc) + (11500.0/10132.0 * B_sb);
+        if (den > 0.0) fom = num / TMath::Sqrt(den);
+        if (!std::isfinite(fom)) fom = 0.0;
 
-        float fom = 0.0;
-        float num = 3600.0/90000.0 * S_mc;
-        float den = (3600.0/90000.0 * S_mc) + B_sb;
-        fom = num / TMath::Sqrt(den);
-
-        std::cout<<Form("thr=%5.3f  S_mc=%.1f  B_sb=%.1f  FOM=%.5f", thr, S_mc, B_sb, fom)<<std::endl;
+        std::cout<<Form("thr=%5.3f  S_mc=%.1f  B_sb=%.1f  FOM=%.2f", thr, S_mc, B_sb, fom)<<std::endl;
 
         // store for graph
         if (ipoint < nsteps) {
@@ -86,35 +81,39 @@ void optimalCUT() {
 
     std::cout<<"\nBest threshold: "<<best_thr<<"  Best FOM: "<<best_fom<<std::endl;
 
-    // Save result to a small text file
-    TString outname = "bdt_optimization_result.txt";
-    std::ofstream ofs(outname.Data());
-    if (ofs.is_open()) {
-        ofs<<"best_thr "<<best_thr<<"\n";
-        ofs<<"best_fom "<<best_fom<<"\n";
-        ofs.close();
-        std::cout<<"Results written to "<<outname<<std::endl;
-    }
-
     // Create and save a graph of FOM vs threshold
     TCanvas *c = new TCanvas("c_optim","BDT optimization",800,600);
     TGraph *g = new TGraph(ipoint, xs, ys);
-    g->SetTitle("FOM vs BDTScore threshold;BDTScore threshold;FOM");
+
+    // Build an explicit frame so PDF is never blank
+    double ymax = 0.0;
+    for (int i = 0; i < ipoint; ++i) {
+        if (std::isfinite(ys[i]) && ys[i] > ymax) ymax = ys[i];
+    }
+    if (ymax <= 0.0) ymax = 1.0;
+
+    TH1F *frame = c->DrawFrame(thr_min, 0.0, thr_max, 1.2 * ymax);
+    frame->SetTitle(";BDTScore ;FOM");
+
     g->SetMarkerStyle(20);
     g->SetMarkerSize(0.8);
     g->SetLineWidth(2);
-    g->Draw("ALP");
+    g->Draw("LP SAME");
     // draw vertical line at best thr
-    TLine *l = new TLine(best_thr, 0, best_thr, g->GetHistogram() ? g->GetHistogram()->GetMaximum() : 1.0);
+    TLine *l = new TLine(best_thr, 0, best_thr, 1.2 * ymax);
     l->SetLineColor(kRed);
     l->SetLineStyle(2);
     l->Draw();
-    c->SaveAs("bdt_optimization.pdf");
 
-    // Save graph to a ROOT file
-    TFile fout("bdt_optimization.root","RECREATE");
-    g->Write("g_fom_vs_thr");
-    fout.Close();
+    // Print best values directly on PDF
+    TLatex latex;
+    latex.SetNDC();
+    latex.SetTextSize(0.035);
+    latex.DrawLatex(0.6, 0.85, Form("Best threshold = %.3f", best_thr));
+    latex.DrawLatex(0.6, 0.82, Form("Best FOM = %.5f", best_fom));
+    if (ipoint == 0) latex.DrawLatex(0.15, 0.77, "No scan points stored");
+
+    c->SaveAs("bdt_optimization.pdf");
 
     delete[] xs; delete[] ys;
     delete c; delete g; delete l;

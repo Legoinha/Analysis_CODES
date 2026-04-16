@@ -6,7 +6,7 @@
 #include <cmath>
 #include "../plotER/aux/masses.h"
 
-void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="PbPb23", bool isMC = true)
+void Flat_TREEs( TString FILEIN="", TString NUN="", TString treename="ntmix", TString P_vs_NP="prompt", TString SYSTEM="PbPb24", bool isMC = false)
 {
 
     bool Fid_region  = true;  // apply fiducial region selection
@@ -62,7 +62,13 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
             }
         }
         else{
-            tin->Add("@data_pbpb_23.txt");       //(lip)
+        
+            std::ifstream fin(FILEIN);
+            std::string line;
+            while (std::getline(fin, line)) {
+                if (line.empty() || line[0] == '#') continue;
+                tin->Add(line.c_str());
+            }
         }
     }
     else if(isPbPb24){
@@ -73,10 +79,13 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
             }
         }
         else{
-
+            std::ifstream fin(FILEIN);
+            std::string line;
+            while (std::getline(fin, line)) {
+                if (line.empty() || line[0] == '#') continue;
+                tin->Add(line.c_str());
+            }
         }
-
-
     }
 
     std::cout << "Total files added: "      << tin->GetNtrees() << std::endl;
@@ -89,7 +98,7 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
     if(isMC){datatype = "MC";}
     else    {datatype = "DATA";}
 
-    TString outputFile = "flat_" + treename + "_" + SYSTEM + "_" + datatype + specCASES + ".root";  //
+    TString outputFile = "flat_" + treename + "_" + SYSTEM + "_" + datatype + specCASES + NUN + ".root";  //
     TFile *fout = new TFile(outputFile, "RECREATE");
     TTree *tout = new TTree(treename, "Flattened tree");
 
@@ -113,7 +122,7 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
     // --------------------------------------------------
     // Input reconstructed branches 
     // --------------------------------------------------
-    const Int_t MAXCAND = 25000;
+    const Int_t MAXCAND = 40000;
     Int_t Bsize, nSelectedChargedTracks, CentBin;
     Float_t Bmass[MAXCAND], Bpt[MAXCAND], By[MAXCAND], Bgen[MAXCAND];
     Bool_t Bmu1isTriggered[MAXCAND];
@@ -307,6 +316,7 @@ void Flat_TREEs(TString treename="ntmix", TString P_vs_NP="prompt", TString SYST
                 }
 
                 // Candidate
+                if (treename == "ntmix" && (Bmass[i] > 4.0 || Bmass[i] < 3.6)) continue;
                 if(Bchi2Prob[i] < 0.005) continue;
                 if(treename == "ntmix" && Bpt[i]<4) continue; 
                 else if (Bpt[i]<1) continue;

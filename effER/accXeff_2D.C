@@ -114,7 +114,7 @@ void accXeff_2D(TString treename = "ntmix", TString SYSTEM = "ppRef", bool forX 
 
     TString GENcut = "1";
     if (treename == "ntmix") { GENcut = forX ? "(abs(GpdgId) == 20443)" : "(abs(GpdgId) == 100443)"; }
-    std::cout << "No ACC cut: "<<  tree_gen->GetEntries(GENcut) << " Gen signals"       << std::endl;
+    std::cout << "No ACC cut: "<<  tree_gen->GetEntries(GENcut) <<" Gen signals"       << std::endl;
     std::cout << "w/ ACC cut: "<<  tree_gen->GetEntries(ACCcut) <<" surviving ACC cut" << std::endl;
 
     tree_gen->Draw("abs(Gy):Gpt>>hDen_ACC", GENcut, "goff");  // Fill Denominator 

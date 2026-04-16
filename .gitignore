@@ -6,3 +6,6 @@
 *.txt
 *.pdf
 *.log
+*.tex
+*.log
+*.aux

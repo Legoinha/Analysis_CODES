@@ -1,11 +1,48 @@
+#pragma once
+
+#include "TAxis.h"
+#include "TSystem.h"
+#include "TLine.h"
+#include "RooCBShape.h"
+#include "RooWorkspace.h"
+#include "RooGlobalFunc.h"
+#include "RooRealVar.h"
+#include "RooDataSet.h"
+#include "RooDataHist.h"
+#include "RooGaussian.h"
+#include "RooFormulaVar.h"
+#include "RooGenericPdf.h"
+#include "RooChebychev.h"
+#include "RooPolynomial.h"
+#include "RooExponential.h"
+#include "RooAddPdf.h"
+#include "RooExtendPdf.h"
+#include "RooPlot.h"
+#include "RooFitResult.h"
+#include "RooChi2Var.h"
+#include "RooHist.h"
+#include "RooProdPdf.h"
+#include "RooAddition.h"
+#include "RooProduct.h"
+#include <RooBifurGauss.h>
+#include <RooCmdArg.h>
+#include <TLegend.h>
+#include <TLatex.h>
+#include <fstream>
 #include <string>
+#include <iomanip>
+#include <TCanvas.h>
+#include <TPad.h>
+#include "RooMCStudy.h"
+#include "../../plotER/aux/masses.h"
+#include <vector>
+#include <array>
 #include <sstream>
 #include <algorithm>
 #include <iterator>
 #include <iostream>
-#include <fstream>
-#include <iomanip>
 #include <utility>
+#include <cmath>
 #include <TFile.h>
 #include <TDirectoryFile.h>
 #include <TDirectory.h>
@@ -18,12 +55,7 @@
 #include <TGraphErrors.h>
 #include <TGraphAsymmErrors.h>
 #include <TF1.h>
-#include <TCanvas.h>
-#include <TPad.h>
-#include <TLatex.h>
 #include <TMathText.h>
-#include <TLegend.h>
-#include <TLine.h>
 #include <TBox.h>
 #include <TCut.h>
 #include <TColor.h>
@@ -35,172 +67,325 @@
 #include <TProfile.h>
 #include <TEfficiency.h>
 #include <TFitResult.h>
+#include "TMultiGraph.h"
+#include <stdio.h>
+
 using namespace std;
 
 
-float cRightMargin = 0.043;
-float cLeftMargin = 0.18;
-float cTopMargin = 0.1;
-float cBottomMargin = 0.145;
-//Color_t BsBoxColor = kAzure+7;
-//Color_t BsPointColor = kAzure-1;
-Color_t BsBoxColor = kMagenta-3;
-Color_t BsPointColor = kMagenta+2;
 
-
-float calPval(float diff, float error, float ndof=1){
-	return TMath::Prob(diff*diff/error/error,ndof);
-}
-
-template <class iNumber>
-int sigDigitAfterDecimal(iNumber i, int ndigit=2){
-	return (fabs(i)<pow(10,ndigit-1)) ?  -int(floor(log10(fabs(i))))+ndigit-1 : 0 ;
-}
-template <class iNumber>
-iNumber roundToNdigit(iNumber i, int ndigit=2){
-	iNumber ifactored = (i >= 0) ? i : -i;
-	int nLogTen	= floor(log10(ifactored));
-	double factorOfTen = pow(10,nLogTen-(ndigit-1));
-	ifactored = ifactored/factorOfTen;
-	ifactored = round(ifactored);
-	ifactored = ifactored*factorOfTen;
-	return (i >= 0) ? ifactored : -ifactored;
-}
-
-template <class Container>
-void split2(const std::string& str, Container& cont, char delim = ' ')
+inline double GetSignificance(
+	RooWorkspace* ws,
+	int count,
+	RooRealVar* mass,
+	double nSigma = 2.0)
 {
-    std::stringstream ss(str);
-    std::string token;
-    while (std::getline(ss, token, delim)) {
-        cont.push_back(token);
-    }
+	if (!ws || !mass) return -1.0;
+
+	RooRealVar* nsigVar = ws->var(Form("nsig%d_%s", count, ""));
+	RooRealVar* nbkgVar = ws->var(Form("nbkg%d_%s", count, ""));
+	RooRealVar* scaleVar = ws->var("scale");
+	RooRealVar* sigma1Var = ws->var(Form("sigma1%d_%s", count, ""));
+	RooRealVar* sigma2Var = ws->var(Form("sigma2%d_%s", count, ""));
+	RooRealVar* fracVar = ws->var(Form("sig1frac%d_%s", count, ""));
+
+	if (!nsigVar || !nbkgVar || !scaleVar || !sigma1Var || !sigma2Var || !fracVar) return -1.0;
+
+	const double signalYield = nsigVar->getVal();
+	const double bkgTotalYield = nbkgVar->getVal();
+	const double scale = scaleVar->getVal();
+	const double sigma1 = sigma1Var->getVal();
+	const double sigma2 = sigma2Var->getVal();
+	const double fracSigma1 = fracVar->getVal();
+
+	RooAbsPdf* bkgPdf = ws->pdf(Form("bkg%d_%s", count, ""));
+	RooRealVar* meanVar = ws->var(Form("mean%d_%s", count, ""));
+	if (!meanVar) return -1.0;
+
+	const double s1 = scale * sigma1;
+	const double s2 = scale * sigma2;
+	const double sigmaEff = std::sqrt(fracSigma1 * s1 * s1 + (1.0 - fracSigma1) * s2 * s2);
+
+	if (!bkgPdf || sigmaEff <= 0.0 || nSigma <= 0.0) return -1.0;
+
+	const double sigLow = meanVar->getVal() - nSigma * sigmaEff;
+	const double sigHigh = meanVar->getVal() + nSigma * sigmaEff;
+	mass->setRange("rangeSIG", sigLow, sigHigh);
+
+	auto* intFrac = bkgPdf->createIntegral(*mass, RooFit::NormSet(*mass), RooFit::Range("rangeSIG"));
+	const double fracInSignal = intFrac ? intFrac->getVal() : 0.0;
+	const double bkgInWindow = fracInSignal * bkgTotalYield;
+	const double denom = signalYield + bkgInWindow;
+	const double signif = (denom > 0.0) ? signalYield / std::sqrt(denom) : -1.0;
+
+	cout << "Signal window: [" << sigLow << ", " << sigHigh << "] (±" << nSigma << "σeff)\n";
+	cout << "Background in Sig. Region " << fracInSignal << " ====> " << bkgInWindow << "\n";
+	cout << "Signal Yield: " << signalYield << "\n";
+	cout << "Significance: " << signif << "\n";
+
+	return signif;
 }
 
-// Remove error
-void removeError(TH1F* h)
+inline double GetChi2Ndf(
+	RooDataSet* ds,
+	RooAbsPdf* pdf,
+	RooRealVar* mass,
+	int nBins,
+	const char* rangeName = "",
+	RooFitResult* fitResult = nullptr,
+	RooWorkspace* ws = nullptr,
+	const char* wsVarName = "")
 {
-  for(int i=1;i<=h->GetNbinsX();i++)
-    {
-      h->SetBinError(i,0);
-    }	
-}
 
-// divide by bin width
-void divideBinWidth(TH1* h)
-{
-  h->Sumw2();
-  for(int i=1;i<=h->GetNbinsX();i++)
-    {
-      Float_t val = h->GetBinContent(i);
-      Float_t valErr = h->GetBinError(i);
-      val/=h->GetBinWidth(i);
-      valErr/=h->GetBinWidth(i);
-      h->SetBinContent(i,val);
-      h->SetBinError(i,valErr);
-    }
-  h->GetXaxis()->CenterTitle();
-  h->GetYaxis()->CenterTitle();
-}
+	const bool hasRange = (rangeName && rangeName[0] != '\0');
+	RooPlot* chi2Frame = mass->frame();
+	RooDataSet* dsForChi2 = ds;
+	if (hasRange) {dsForChi2 = static_cast<RooDataSet*>(ds->reduce(RooFit::CutRange(rangeName)));}
 
-// make a histogram from TF1 function
-TH1F* functionHist(TF1* f, TH1F* h, TString fHistname)
-{
-  TH1F* hF = (TH1F*)h->Clone(fHistname);
-  for (int i=1;i<=h->GetNbinsX();i++)
-    {
-      Double_t var = f->Integral(h->GetBinLowEdge(i),h->GetBinLowEdge(i+1))/h->GetBinWidth(i);
-      hF->SetBinContent(i,var);
-      hF->SetBinError(i,0);
-    }
-  return hF;
-}
+	dsForChi2->plotOn(chi2Frame, RooFit::Name("chi2_data_tmp"), RooFit::Binning(nBins));
+	if (hasRange) { pdf->plotOn(chi2Frame, RooFit::Name("chi2_pdf_tmp"), RooFit::Range(rangeName), RooFit::NormRange(rangeName));}
+	else { pdf->plotOn(chi2Frame, RooFit::Name("chi2_pdf_tmp"), RooFit::Range(""), RooFit::NormRange(""));}
 
-TLegend* myLegend(Double_t x1, Double_t y1, Double_t x2, Double_t y2)
-{
-  TLegend* leg = new TLegend(x1,y1,x2,y2);
-  leg->SetBorderSize(0);
-  leg->SetFillStyle(0);
-  return leg; 
-}
-
-void setTex(TLatex* tex){
-    tex->SetNDC();
-    tex->SetTextFont(42);
-    tex->SetTextSize(0.055);
-    tex->SetLineWidth(2);
-}
-
-void setHist(TH1D* h){
-    //h->SetYTitle("Events / (20 MeV/c^{2})");
-    h->GetXaxis()->CenterTitle();
-    h->GetYaxis()->CenterTitle();
-    h->GetXaxis()->SetTitleOffset(1.0);
-    h->GetYaxis()->SetTitleOffset(1.4);
-    h->GetXaxis()->SetTitleSize(0.055);
-    h->GetYaxis()->SetTitleSize(0.055);
-    h->GetXaxis()->SetTitleFont(42);
-    h->GetYaxis()->SetTitleFont(42);
-    h->GetXaxis()->SetLabelFont(42);
-    h->GetYaxis()->SetLabelFont(42);
-    h->GetXaxis()->SetLabelSize(0.055);
-    h->GetYaxis()->SetLabelSize(0.055);
-    h->SetMarkerSize(1.55);
-    h->SetMarkerColor(4);
-    h->SetLineWidth(4);
-    h->SetStats(0);
-    h->GetXaxis()->SetNdivisions(-50205);
-}
-
-float findNcoll(int hiBin) {
-   const int nbins = 200;
-   const float Ncoll[nbins] = {1976.95, 1944.02, 1927.29, 1891.9, 1845.3, 1807.2, 1760.45, 1729.18, 1674.8, 1630.3, 1590.52, 1561.72, 1516.1, 1486.5, 1444.68, 1410.88, 1376.4, 1347.32, 1309.71, 1279.98, 1255.31, 1219.89, 1195.13, 1165.96, 1138.92, 1113.37, 1082.26, 1062.42, 1030.6, 1009.96, 980.229, 955.443, 936.501, 915.97, 892.063, 871.289, 847.364, 825.127, 806.584, 789.163, 765.42, 751.187, 733.001, 708.31, 690.972, 677.711, 660.682, 640.431, 623.839, 607.456, 593.307, 576.364, 560.967, 548.909, 530.475, 519.575, 505.105, 490.027, 478.133, 462.372, 451.115, 442.642, 425.76, 416.364, 405.154, 392.688, 380.565, 371.167, 360.28, 348.239, 340.587, 328.746, 320.268, 311.752, 300.742, 292.172, 281.361, 274.249, 267.025, 258.625, 249.931, 240.497, 235.423, 228.63, 219.854, 214.004, 205.425, 199.114, 193.618, 185.644, 180.923, 174.289, 169.641, 161.016, 157.398, 152.151, 147.425, 140.933, 135.924, 132.365, 127.017, 122.127, 117.817, 113.076, 109.055, 105.16, 101.323, 98.098, 95.0548, 90.729, 87.6495, 84.0899, 80.2237, 77.2201, 74.8848, 71.3554, 68.7745, 65.9911, 63.4136, 61.3859, 58.1903, 56.4155, 53.8486, 52.0196, 49.2921, 47.0735, 45.4345, 43.8434, 41.7181, 39.8988, 38.2262, 36.4435, 34.8984, 33.4664, 31.8056, 30.351, 29.2074, 27.6924, 26.7754, 25.4965, 24.2802, 22.9651, 22.0059, 21.0915, 19.9129, 19.1041, 18.1487, 17.3218, 16.5957, 15.5323, 14.8035, 14.2514, 13.3782, 12.8667, 12.2891, 11.61, 11.0026, 10.3747, 9.90294, 9.42648, 8.85324, 8.50121, 7.89834, 7.65197, 7.22768, 6.7755, 6.34855, 5.98336, 5.76555, 5.38056, 5.11024, 4.7748, 4.59117, 4.23247, 4.00814, 3.79607, 3.68702, 3.3767, 3.16309, 2.98282, 2.8095, 2.65875, 2.50561, 2.32516, 2.16357, 2.03235, 1.84061, 1.72628, 1.62305, 1.48916, 1.38784, 1.28366, 1.24693, 1.18552, 1.16085, 1.12596, 1.09298, 1.07402, 1.06105, 1.02954};
-   return Ncoll[hiBin];
-}
-
-float findNpart(int hiBin) {
-   const int nbins = 200;
-   const float Npart[nbins] = {401.99, 398.783, 396.936, 392.71, 387.901, 383.593, 377.914, 374.546, 367.507, 361.252, 356.05, 352.43, 345.701, 341.584, 335.148, 330.581, 325.135, 320.777, 315.074, 310.679, 306.687, 301.189, 296.769, 291.795, 287.516, 283.163, 277.818, 274.293, 269.29, 265.911, 260.574, 256.586, 252.732, 249.194, 245.011, 241.292, 236.715, 232.55, 229.322, 225.328, 221.263, 218.604, 214.728, 210.554, 206.878, 203.924, 200.84, 196.572, 193.288, 189.969, 186.894, 183.232, 180.24, 177.36, 174.008, 171.222, 168.296, 165.319, 162.013, 158.495, 156.05, 154.218, 150.559, 148.455, 145.471, 142.496, 139.715, 137.395, 134.469, 131.926, 129.817, 127.045, 124.467, 122.427, 119.698, 117.607, 114.543, 112.662, 110.696, 108.294, 105.777, 103.544, 101.736, 99.943, 97.4951, 95.4291, 93.2148, 91.2133, 89.5108, 87.2103, 85.7498, 83.5134, 81.9687, 79.7456, 78.1684, 76.4873, 74.7635, 72.761, 71.0948, 69.6102, 67.7806, 66.2215, 64.5813, 63.0269, 61.4325, 59.8065, 58.2423, 57.2432, 55.8296, 54.2171, 52.8809, 51.3254, 49.9902, 48.6927, 47.5565, 46.136, 44.8382, 43.6345, 42.3964, 41.4211, 39.9681, 39.178, 37.9341, 36.9268, 35.5626, 34.5382, 33.6912, 32.8156, 31.6695, 30.6552, 29.7015, 28.8655, 27.9609, 27.0857, 26.105, 25.3163, 24.4872, 23.6394, 23.0484, 22.2774, 21.4877, 20.5556, 19.9736, 19.3296, 18.5628, 17.916, 17.2928, 16.6546, 16.1131, 15.4013, 14.8264, 14.3973, 13.7262, 13.2853, 12.8253, 12.2874, 11.7558, 11.2723, 10.8829, 10.4652, 9.96477, 9.6368, 9.09316, 8.84175, 8.48084, 8.05694, 7.64559, 7.29709, 7.07981, 6.70294, 6.45736, 6.10284, 5.91788, 5.5441, 5.33311, 5.06641, 4.96415, 4.6286, 4.38214, 4.2076, 4.01099, 3.81054, 3.63854, 3.43403, 3.23244, 3.08666, 2.86953, 2.74334, 2.62787, 2.48354, 2.38115, 2.26822, 2.23137, 2.1665, 2.14264, 2.10636, 2.07358, 2.05422, 2.04126, 2.00954};
-   return Npart[hiBin];
-}
-
-float findNcollAverage(int hiBinLow, int hiBinHigh) {
-   float w=0;
-   const int nbins = 200;
-   const float Ncoll[nbins] = {1976.95, 1944.02, 1927.29, 1891.9, 1845.3, 1807.2, 1760.45, 1729.18, 1674.8, 1630.3, 1590.52, 1561.72, 1516.1, 1486.5, 1444.68, 1410.88, 1376.4, 1347.32, 1309.71, 1279.98, 1255.31, 1219.89, 1195.13, 1165.96, 1138.92, 1113.37, 1082.26, 1062.42, 1030.6, 1009.96, 980.229, 955.443, 936.501, 915.97, 892.063, 871.289, 847.364, 825.127, 806.584, 789.163, 765.42, 751.187, 733.001, 708.31, 690.972, 677.711, 660.682, 640.431, 623.839, 607.456, 593.307, 576.364, 560.967, 548.909, 530.475, 519.575, 505.105, 490.027, 478.133, 462.372, 451.115, 442.642, 425.76, 416.364, 405.154, 392.688, 380.565, 371.167, 360.28, 348.239, 340.587, 328.746, 320.268, 311.752, 300.742, 292.172, 281.361, 274.249, 267.025, 258.625, 249.931, 240.497, 235.423, 228.63, 219.854, 214.004, 205.425, 199.114, 193.618, 185.644, 180.923, 174.289, 169.641, 161.016, 157.398, 152.151, 147.425, 140.933, 135.924, 132.365, 127.017, 122.127, 117.817, 113.076, 109.055, 105.16, 101.323, 98.098, 95.0548, 90.729, 87.6495, 84.0899, 80.2237, 77.2201, 74.8848, 71.3554, 68.7745, 65.9911, 63.4136, 61.3859, 58.1903, 56.4155, 53.8486, 52.0196, 49.2921, 47.0735, 45.4345, 43.8434, 41.7181, 39.8988, 38.2262, 36.4435, 34.8984, 33.4664, 31.8056, 30.351, 29.2074, 27.6924, 26.7754, 25.4965, 24.2802, 22.9651, 22.0059, 21.0915, 19.9129, 19.1041, 18.1487, 17.3218, 16.5957, 15.5323, 14.8035, 14.2514, 13.3782, 12.8667, 12.2891, 11.61, 11.0026, 10.3747, 9.90294, 9.42648, 8.85324, 8.50121, 7.89834, 7.65197, 7.22768, 6.7755, 6.34855, 5.98336, 5.76555, 5.38056, 5.11024, 4.7748, 4.59117, 4.23247, 4.00814, 3.79607, 3.68702, 3.3767, 3.16309, 2.98282, 2.8095, 2.65875, 2.50561, 2.32516, 2.16357, 2.03235, 1.84061, 1.72628, 1.62305, 1.48916, 1.38784, 1.28366, 1.24693, 1.18552, 1.16085, 1.12596, 1.09298, 1.07402, 1.06105, 1.02954};
-   for(int i=hiBinLow; i<hiBinHigh; i++)  w+=Ncoll[i]/(hiBinHigh-hiBinLow);
-   return w;
-}
-
-float findNpartAverage(int hiBinLow, int hiBinHigh) {
-   float w=0;
-   const int nbins = 200;
-   const float Npart[nbins] = {401.99, 398.783, 396.936, 392.71, 387.901, 383.593, 377.914, 374.546, 367.507, 361.252, 356.05, 352.43, 345.701, 341.584, 335.148, 330.581, 325.135, 320.777, 315.074, 310.679, 306.687, 301.189, 296.769, 291.795, 287.516, 283.163, 277.818, 274.293, 269.29, 265.911, 260.574, 256.586, 252.732, 249.194, 245.011, 241.292, 236.715, 232.55, 229.322, 225.328, 221.263, 218.604, 214.728, 210.554, 206.878, 203.924, 200.84, 196.572, 193.288, 189.969, 186.894, 183.232, 180.24, 177.36, 174.008, 171.222, 168.296, 165.319, 162.013, 158.495, 156.05, 154.218, 150.559, 148.455, 145.471, 142.496, 139.715, 137.395, 134.469, 131.926, 129.817, 127.045, 124.467, 122.427, 119.698, 117.607, 114.543, 112.662, 110.696, 108.294, 105.777, 103.544, 101.736, 99.943, 97.4951, 95.4291, 93.2148, 91.2133, 89.5108, 87.2103, 85.7498, 83.5134, 81.9687, 79.7456, 78.1684, 76.4873, 74.7635, 72.761, 71.0948, 69.6102, 67.7806, 66.2215, 64.5813, 63.0269, 61.4325, 59.8065, 58.2423, 57.2432, 55.8296, 54.2171, 52.8809, 51.3254, 49.9902, 48.6927, 47.5565, 46.136, 44.8382, 43.6345, 42.3964, 41.4211, 39.9681, 39.178, 37.9341, 36.9268, 35.5626, 34.5382, 33.6912, 32.8156, 31.6695, 30.6552, 29.7015, 28.8655, 27.9609, 27.0857, 26.105, 25.3163, 24.4872, 23.6394, 23.0484, 22.2774, 21.4877, 20.5556, 19.9736, 19.3296, 18.5628, 17.916, 17.2928, 16.6546, 16.1131, 15.4013, 14.8264, 14.3973, 13.7262, 13.2853, 12.8253, 12.2874, 11.7558, 11.2723, 10.8829, 10.4652, 9.96477, 9.6368, 9.09316, 8.84175, 8.48084, 8.05694, 7.64559, 7.29709, 7.07981, 6.70294, 6.45736, 6.10284, 5.91788, 5.5441, 5.33311, 5.06641, 4.96415, 4.6286, 4.38214, 4.2076, 4.01099, 3.81054, 3.63854, 3.43403, 3.23244, 3.08666, 2.86953, 2.74334, 2.62787, 2.48354, 2.38115, 2.26822, 2.23137, 2.1665, 2.14264, 2.10636, 2.07358, 2.05422, 2.04126, 2.00954};
-   for(int i=hiBinLow; i<hiBinHigh; i++)  w+=Npart[i]/(hiBinHigh-hiBinLow);
-   return w;
-}
-
-void adjustLegend(TLegend* l){
-    l->SetBorderSize(0);
-    l->SetLineColor(0);
-    l->SetFillColor(0);
-    l->SetFillStyle(1001);
-    l->SetTextFont(42);
-    l->SetTextSize(0.055);
-}
-
-void chi2Cal(double dataArr[], double dataErrArr[], double fitArr[], int nbin, double& chi2Std, double& chi2Neyman, double& chi2Peason, double& chi2BakerCousins){
-    for(int i = 0; i < nbin; i++){
-		if(dataErrArr[i] != 0){
-			chi2Std += (dataArr[i]-fitArr[i])*(dataArr[i]-fitArr[i])/dataErrArr[i]/dataErrArr[i];
-			chi2Neyman += (dataArr[i]-fitArr[i])*(dataArr[i]-fitArr[i])/dataErrArr[i]/dataErrArr[i];
-			chi2BakerCousins += 2*(fitArr[i] - dataArr[i] + dataArr[i]*log(dataArr[i]/fitArr[i]));
+	int nPar = 0;
+	if (fitResult) {
+		nPar = fitResult->floatParsFinal().getSize();
+	} else {
+		RooArgSet* pars = pdf->getParameters(*ds);
+		if (pars) {
+			RooAbsCollection* floatPars = pars->selectByAttrib("Constant", kFALSE);
+			if (floatPars) {
+				nPar = floatPars->getSize();
+				delete floatPars;
+			}
+			delete pars;
 		}
-		else{
-			//assuming bin with zero content have error == 1
-			chi2Std += (dataArr[i]-fitArr[i])*(dataArr[i]-fitArr[i]);
-			chi2BakerCousins += 2*(fitArr[i] - dataArr[i] + dataArr[i]*log(1/fitArr[i]));
-		}
-		chi2Peason += (dataArr[i]-fitArr[i])*(dataArr[i]-fitArr[i])/fitArr[i];
 	}
+
+	double chi2Ndf = chi2Frame->chiSquare("chi2_pdf_tmp", "chi2_data_tmp", nPar);
+	if (!std::isfinite(chi2Ndf) || chi2Ndf < 0) chi2Ndf = -1.0;
+
+	if (ws && wsVarName && wsVarName[0] != '\0') {
+		RooRealVar chi2Var(wsVarName, "", chi2Ndf);
+		ws->import(chi2Var);
+	}
+
+	delete chi2Frame;
+	if (dsForChi2 != ds) delete dsForChi2;
+	return chi2Ndf;
+}
+
+inline void setupLABELS(TLatex* latexTEXT, double tSize = 0.035, bool DrawText = true){
+	latexTEXT->SetNDC();
+	latexTEXT->SetTextAlign(13);
+	latexTEXT->SetTextFont(42);
+	latexTEXT->SetTextSize(tSize);
+	latexTEXT->SetLineWidth(2);
+	if (DrawText) latexTEXT->Draw();
+}
+
+inline void DrawCmsHeader(
+	TPad* pad,
+	TString COLsystem = "",
+	const TString& leftText = "#bf{CMS} #it{Preliminary}",
+	float textSize = 0.045,
+	float yOffset = 0.30)
+{
+	if (!pad) return;
+	TString rightText = "";
+	if (COLsystem=="ppRef") rightText = "pp #sqrt{s}=5.36 TeV, (L=455.7 pb^{-1})" ;
+	else if (COLsystem=="PbPb23") rightText = "PbPb #sqrt{s_{NN}}=5.36 TeV, (L=1.72 nb^{-1})" ;
+
+
+	pad->cd();
+	const float l = pad->GetLeftMargin();
+	const float t = pad->GetTopMargin();
+	const float r = pad->GetRightMargin();
+	const float y = 1.f - t + yOffset * t;
+
+	TLatex latex;
+	latex.SetNDC();
+	latex.SetTextAngle(0);
+	latex.SetTextColor(kBlack);
+	latex.SetTextFont(42);
+	latex.SetTextSize(textSize);
+	latex.SetTextAlign(11);
+	latex.DrawLatex(l+0.04, y, leftText);
+	latex.SetTextAlign(31);
+	latex.SetTextSize(textSize-0.015);
+	latex.DrawLatex(1.f - r +0.06, y, rightText);
+}
+
+
+
+
+
+
+
+struct SystVariationConfig {
+	std::string code;
+	std::string label;
+};
+
+inline std::vector<SystVariationConfig> GetBackgroundSystematicModels(const TString& tree)
+{
+	if (tree == "ntphi")  {//3rd-order Chebyshev
+		return {{"2nd", "2nd-order Chebyshev"}, {"4th", "4th-order Chebyshev"}};
+	}
+	if (tree == "ntKstar"){//3rd-order Chebyshev
+		return {{"2nd", "2nd-order Chebyshev"}, {"3rd", "3rd-order Chebyshev"}};
+	}
+	if (tree == "ntKp")  {//Exponential
+		return {{"2nd", "2nd-order Chebyshev + erfc"}, {"3rd", "3rd-order Chebyshev + erfc"}};
+	}
+	if (tree == "ntmix") {//3rd-order Chebyshev
+		return {{"4th", "4th-order Chebyshev"}};
+	}
+	return {};
+}
+
+inline std::vector<SystVariationConfig> GetSignalSystematicModels(const TString& tree)
+{
+
+	if (tree == "ntphi")  {// Double Gaussian
+		return {{"1gauss", "Gaussian"}, {"fixed", "Fixed mean"}};
+	}
+	if (tree == "ntKstar"){// Double Gaussian
+		return {{"3gauss", "Triple Gaussian"}, {"gauss_cb", "Gaussian + Crystal Ball"}, {"fixed", "Fixed mean"}};
+	}
+	if (tree == "ntKp")  {// Double Gaussian
+		return {{"3gauss", "Triple Gaussian"}, {"gauss_cb", "Gaussian + Crystal Ball"}, {"fixed", "Fixed mean"}};
+	}
+	if (tree == "ntmix") {// Double Gaussian
+		return {{"1gauss", "Gaussian"}, {"3gauss", "Triple Gaussian"}};
+	}
+	return {};
+}
+
+inline std::string GetSystematicColumnLabel(const TString& var, double lowEdge, double highEdge)
+{
+	std::ostringstream clabel;
+	if (var == "Bpt") { clabel << lowEdge << "$<p_T<$" << highEdge   ;} 
+  else if (var == "By") { clabel << lowEdge << "$<|y|<$" << highEdge ;} 
+  else if (var == "nSelectedChargedTracks") { clabel << lowEdge << "$<nTrks<$" << highEdge ;} 
+  else if (var == "CentBin") { clabel << lowEdge << "$<Cent<$" << highEdge ;} 
+  else { clabel << lowEdge << "<" << var.Data() << "<" << highEdge  ;}
+	return clabel.str();
+}
+
+inline std::vector<std::string> GetGeneralSystematicLabels()
+{
+	return {"Background PDF", "Signal PDF", "Total Systematic"};
+}
+
+inline std::vector<std::vector<double> > BuildGeneralSystematicNumbers(
+	const std::vector<std::vector<double> >& general_syst,
+	const std::vector<std::vector<double> >& stat_error)
+{
+	(void)stat_error;
+	return general_syst;
+}
+
+
+
+
+
+
+
+
+
+inline void latex_table_block(
+	std::ostream& out,
+	int n_col,
+	int n_lin,
+	const std::vector<std::string>& col_name,
+	const std::vector<std::string>& labels,
+	const std::vector<std::vector<double> >& numbers)
+{
+	std::string col = "c";
+	for (int i=1; i<n_col; i++) col += "|c";
+
+	out << "\\begin{center}" << std::endl;
+	out << "\\small" << std::endl;
+	out << "\\begin{tabular}{" + col + "}" << std::endl;
+	out << "\\toprule" << std::endl;
+
+	for (int c=0; c<n_col-1; c++) out << col_name[c] << " & ";
+	out << col_name[n_col-1] << " \\\\ \\midrule" << std::endl;
+
+	for (int i=1; i<n_lin; i++) {
+		out << labels[i-1] << " & ";
+		for (int c=1; c<n_col-1; c++) out << numbers[c-1][i-1] << " \\% & ";
+		out << numbers[n_col-2][i-1] << " \\% \\\\" << std::endl;
+	}
+
+	out << "\\bottomrule" << std::endl;
+	out << "\\end{tabular}" << std::endl;
+	out << "\\end{center}" << std::endl;
+}
+
+inline void latex_tables_document(
+	std::string filename,
+	const std::vector<int>& n_cols,
+	const std::vector<int>& n_lines,
+	const std::vector<std::vector<std::string> >& col_names,
+	const std::vector<std::vector<std::string> >& labels,
+	const std::vector<std::vector<std::vector<double> > >& numbers)
+{
+	std::ofstream file(filename + ".tex");
+	std::ofstream file_check(filename + "_check.tex");
+	file << std::fixed << std::setprecision(2);
+	file_check << std::fixed << std::setprecision(2);
+
+	file_check << "\\documentclass{article}" << std::endl;
+	file_check << "\\usepackage{geometry}" << std::endl;
+	file_check << "\\usepackage{booktabs}" << std::endl;
+	file_check << "\\geometry{a4paper, total={170mm,257mm}, left=20mm, top=20mm,}" << std::endl;
+	file_check << "\\begin{document}" << std::endl;
+
+	for (size_t i = 0; i < n_cols.size(); ++i) {
+		latex_table_block(file, n_cols[i], n_lines[i], col_names[i], labels[i], numbers[i]);
+		latex_table_block(file_check, n_cols[i], n_lines[i], col_names[i], labels[i], numbers[i]);
+		if (i + 1 < n_cols.size()) {
+			file << std::endl << std::endl;
+			file_check << "\\vspace{0.5cm}" << std::endl;
+		}
+	}
+
+	file_check << "\\end{document}" << std::endl;
+	file.close();
+	file_check.close();
+
+	std::string pdfCmd = "pdflatex -interaction=nonstopmode -output-directory=./files " + filename + "_check.tex";
+	(void)system(pdfCmd.c_str());
+	std::remove((filename + "_check.aux").c_str());
+	std::remove((filename + "_check.log").c_str());
+}
+
+inline void WriteSystematicsTablesDocument(
+	const std::string& filename,
+	const std::vector<std::string>& col_name_signal,
+	const std::vector<std::string>& col_name_back,
+	const std::vector<std::string>& col_name_general,
+	const std::vector<std::string>& labels_signal,
+	const std::vector<std::string>& labels_back,
+	const std::vector<std::string>& labels_general,
+	const std::vector<std::vector<double> >& signal_numbers,
+	const std::vector<std::vector<double> >& back_numbers,
+	const std::vector<std::vector<double> >& general_numbers)
+{
+	std::vector<int> table_n_cols = {
+		static_cast<int>(col_name_signal.size()),
+		static_cast<int>(col_name_back.size()),
+		static_cast<int>(col_name_general.size())
+	};
+	std::vector<int> table_n_lines = {
+		static_cast<int>(1 + labels_signal.size()),
+		static_cast<int>(1 + labels_back.size()),
+		static_cast<int>(1 + labels_general.size())
+	};
+	std::vector<std::vector<std::string> > table_col_names = {col_name_signal, col_name_back, col_name_general};
+	std::vector<std::vector<std::string> > table_labels = {labels_signal, labels_back, labels_general};
+	std::vector<std::vector<std::vector<double> > > table_numbers = {signal_numbers, back_numbers, general_numbers};
+
+	latex_tables_document(filename, table_n_cols, table_n_lines, table_col_names, table_labels, table_numbers);
 }

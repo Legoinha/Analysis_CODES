@@ -10,16 +10,17 @@
 #include "aux/parameters.h"
 #include "aux/masses.h"
 
-void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
+void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "PbPb24")
 {
 
     //VARIABLES to be plotted
     //VARIABLES
-    const char * variables[] = {"Bmass", "abs(BLxy)",   "Bujmass", "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",   "Balpha",   "Bpt",     "BQvalue",    "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D",   "Bnorm_trk1Dxy"};
-    const double ranges[][2] = {{3.6,4},    {0,0.1},  {2.9,3.25},           {0,0.25},    {0,2.4},         {0,1},   {0,3.14},  {0,50},     {0.0,1},    {0.0,1.5},       {0.9,1},    {0,0.45},     {0.0,1},     {0,1},    {0.,5},    {0.,5},                  {0,20},          {-50,50}};
+    const char * variables[] = {"Bmass", "abs(BLxy)",  "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",    "Bpt",     "BQvalue",   "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D",   };
+    const double ranges[][2] = {{3.6,4},    {0,0.1},             {0,0.25},    {0,2.4},         {0,1},   {0,50},     {0.0,0.2},         {0.9,1},    {0,0.45},     {0.0,1},     {0,1},    {0.,5},    {0.,5},                  {0,20},   };    
+    //const char * variables[] = {"xgb_score"};
+    //const double ranges[][2] = {{0,1}};
     
     //VARIABLES
-    
     //VARIABLES
     //VARIABLES
 
@@ -30,17 +31,23 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
     TString path_to_file = "";
     TString path_to_MC   = "";
 
-    if (systemNAME.Contains("PbPb23")){ //PbPb system
+    if (systemNAME.Contains("PbPb24")){ //PbPb system
         if (TREE == "ntmix"){
-            chain.Add("/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2023/DATA_X3872_PbPb.root");
-            path_to_MC = "/eos/user/h/hmarques/X3872/DATA_sharing/dataMC_2023/MC_X3872_PbPb.root";
+            chain.Add(   "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_MC.root";
+        }
+    }
+    else if (systemNAME.Contains("PbPb23")){ //PbPb system
+        if (TREE == "ntmix"){
+            chain.Add(   "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC.root";
         }
     }
     else{ //ppRef system
-        if (TREE == "ntmix"){      //X3872
-            chain.Add( "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA.root");
-            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC.root";
-        } 
+        if (TREE == "ntmix"){     //X3872
+            chain.Add( "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root");
+            path_to_MC="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore.root";
+        }
         else if (TREE == "ntphi"){ //B0s
             chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_DATA.root"); 
             path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_MC.root";
@@ -97,9 +104,9 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
                
         TString sideband = "1"; 
         if (true){ // BKG from DATA sideband
-            if(TREE == "ntmix"){                            sideband = "(Bmass < 3.60 || Bmass > 3.95 || (Bmass > 3.75 && Bmass < 3.8))";}
+            if(TREE == "ntmix"){                            sideband = "(Bmass < 3.63 || Bmass > 3.95 || (Bmass > 3.75 && Bmass < 3.8))";}
             else if (TREE == "ntphi" || TREE == "ntKstar") {sideband = "(Bmass > 5.55)";}
-            else if (TREE == "ntKp")                       {sideband = "(Bmass > 5.55 )";}
+            else if (TREE == "ntKp")                       {sideband = "((Bmass > 5.15 && Bmass < 5.20) || (Bmass > 5.40 && Bmass < 5.55))";}
         }
 
         TString ANYsel = "1"; // customize if needed
@@ -116,14 +123,15 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
 
         // Customize Histograms
         hist_SIG->SetLineColor(kOrange-3);
+        hist_SIG->SetLineWidth(3);
+        hist_SIG->SetFillStyle(0);
         hist_SIG->Scale(1.0 / hist_SIG->Integral());
         if(TREE == "ntmix"){
-            hist_SIG->SetLineWidth(3);
             hist_spec->SetLineColor(kOrange-2);
             hist_spec->SetLineWidth(3);
+            hist_spec->SetFillStyle(0);
             hist_spec->Scale(1.0 / hist_spec->Integral());
-        } 
-        else{hist_SIG->SetFillColor(kOrange-3);}
+        }
         hist_BKG->Scale(1.0 / hist_BKG->Integral());
         hist_BKG->SetLineColor(kBlue);
         hist_BKG->SetFillColor(kBlue);     
@@ -136,14 +144,19 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
             hist_BKG->SetMaximum(max_val * 1.1);
         }
 
-        // Draw the histograms
-        hist_SIG->Draw("HIST");
+        // Force all plots to start at zero on the vertical axis
+        hist_SIG->SetMinimum(0.0);
+        hist_BKG->SetMinimum(0.0);
+        if (TREE == "ntmix") hist_spec->SetMinimum(0.0);
+
+        // Draw the histograms (background first, signal on top)
+        hist_BKG->Draw("HIST");
+        hist_SIG->Draw("HIST SAME");
         if (TREE == "ntmix") hist_spec->Draw("HIST SAME");
-        hist_BKG->Draw("HIST SAME");
         gPad->Update();
 
         // Add legend instead of stats boxes
-        TLegend *leg = new TLegend(0.7, 0.85, 0.85, 0.95);
+        TLegend *leg = new TLegend(0.68, 0.78, 0.88, 0.94, systemNAME.Data(), "brNDC");
         leg->SetBorderSize(0);
         leg->SetFillStyle(0);
         leg->SetTextSize(0.03);
@@ -151,7 +164,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
             leg->AddEntry(hist_SIG, "MC Sig: X(3872)", "l");
             leg->AddEntry(hist_spec, "MC Sig: #Psi(2S)", "l");
         } else {
-            leg->AddEntry(hist_SIG, "MC Sig", "f");
+            leg->AddEntry(hist_SIG, "MC Sig", "l");
         }
         leg->AddEntry(hist_BKG, "Data sideband", "f");
         leg->Draw();
