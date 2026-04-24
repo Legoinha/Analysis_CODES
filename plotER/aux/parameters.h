@@ -4,7 +4,7 @@
 double BR_B0s_jpsiphi_mumuKK = 3.04*10e-5;
 double BR_Bp_jpsiK_mumuK = 6.08*10e-5;
 
-int nbinsmasshisto = 80;
+int nbinsmasshisto = 40;
 
 double minhisto = 0;
 double maxhisto = 999;

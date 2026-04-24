@@ -7,14 +7,14 @@ DOANALYSISPbPb_BINNED_MULT_X=0
 syst="ppRef"
 
 #Data and MC Samples
-MC_X="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore.root"
-Data_X="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root"  
+MC_X="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore_X3872.root"
+Data_X="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root"
 #Data and MC Samples
 
 ## SELECTION CUTs go here 
 #CUTs="BQvalue<0.150 && Btrk1dR < 0.55 && Btrk2dR < 0.55 "
-#CUTs="BQvalue<0.300 && Btrk1dR < 0.55 && Btrk2dR < 0.55 && Bpt > 10 && Bpt < 50 && abs(By)<1.2"  ## RUN1
-CUTs="xgb_score > 0.55 && BQvalue<0.13"
+#CUTs="Btrk1dR < 0.55 && Btrk2dR < 0.55 && Bpt < 50"  ## RUN1 && Bpt > 10 && Bpt < 50 && abs(By)<1.2
+CUTs="xgb_score > 0.55 && BQvalue<0.10"  ##
 #CUTs="1"  #"((Bpt > 5 && Bpt < 7.5) && abs(By) > 1.4) ||  (Bpt > 7.5 && Bpt < 50 && abs(By) < 2.4)"
 
 
@@ -22,7 +22,7 @@ mkdir -p ROOTfiles/
 
 #The Function to be called:
 #
-#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString OUTPLOTF = "", TString ExtraMCsample = "", TString SYSTEM = "ppRef"){
+#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef"){
 #
 
 if [ $DOANALYSISPbPb_FULL_X  -eq 1  ]; then
@@ -32,8 +32,6 @@ root -b -q "roofitB.C++(\"ntmix\", \
                       \"$MC_X\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"results/X/Bpt\", \
-                      \" \", \
                       \"$syst\")"
 fi
 
@@ -44,8 +42,6 @@ root -b -q "roofitB.C(\"ntmix\",\
                       \"$MC_X\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"results/X/Bpt\", \
-                      \" \", \
                       \"$syst\")"
 fi
 
@@ -56,8 +52,6 @@ root -b -q "roofitB.C(\"ntmix\",\
                       \"$MC_X\", \
                       \"nSelectedChargedTracks\", \
                       \"$CUTs\", \
-                      \"results/X/nMult\", \
-                      \" \", \
                       \"$syst\")"
 fi
 

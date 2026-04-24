@@ -6,6 +6,7 @@ set -euo pipefail
 # Examples:
 #   bash run_DataSIGNAL_VS_MC.sh ntphi
 #   bash run_DataSIGNAL_VS_MC.sh ntmix
+#   bash run_DataSIGNAL_VS_MC.sh ntmix_psi2s
 #   bash run_DataSIGNAL_VS_MC.sh ntphi "Bnorm_svpvDistance_2D > 4"
 
 TREE="${1:-ntphi}"
@@ -15,9 +16,13 @@ CUT_DEFAULT="1"
 case "$TREE" in
   ntmix)
     DATA_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root"
-    MC_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore.root"
-    CUT_DEFAULT="xgb_score > 0.5 && BQvalue<0.15"
-    #CUT_DEFAULT="BQvalue<0.300 && Btrk1dR < 0.55 && Btrk2dR < 0.55 && Bpt > 10 && Bpt < 50 && abs(By)<1.2 "
+    MC_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore_X3872.root"
+    CUT_DEFAULT="xgb_score > 0.55 && BQvalue<0.15"
+    ;;
+  ntmix_psi2s)
+    DATA_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root"
+    MC_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore_psi2s.root"
+    CUT_DEFAULT="xgb_score > 0.55 && BQvalue<0.15"
     ;;
   ntphi)
     DATA_DEFAULT="/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_DATA.root"
@@ -36,7 +41,7 @@ case "$TREE" in
     ;;
   *)
     echo "Unknown tree: $TREE"
-    echo "Use one of: ntmix, ntphi, ntKp, ntKstar"
+    echo "Use one of: ntmix, ntmix_psi2s, ntphi, ntKp, ntKstar"
     exit 1
     ;;
 esac

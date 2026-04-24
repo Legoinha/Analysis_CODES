@@ -26,8 +26,9 @@ void renameTree(const char* fname,
 
     t->SetName(newName);
     t->Write("", TObject::kOverwrite);
+    f.Delete(Form("%s;*", oldName));
 
-    printf("Renamed tree '%s' -> '%s' in %s\n", oldName, newName, fname);
+    printf("Renamed tree '%s' -> '%s' in %s and removed old key(s)\n", oldName, newName, fname);
 
     f.Close();
 }

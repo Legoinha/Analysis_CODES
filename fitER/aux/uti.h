@@ -31,6 +31,7 @@
 #include <fstream>
 #include <string>
 #include <iomanip>
+#include <iostream>
 #include <TCanvas.h>
 #include <TPad.h>
 #include "RooMCStudy.h"
@@ -71,6 +72,26 @@
 #include <stdio.h>
 
 using namespace std;
+
+
+
+inline double GetNtmixDataYmax(float binMin, float binMax)
+{
+    if (binMin == 5. && binMax == 50.) return 7300.0;
+    else if (binMin == 5. && binMax == 10.) return 200.0;
+    else if (binMin == 10. && binMax == 15.) return 2400.0;
+    else if (binMin == 15. && binMax == 25.) return 3700.0;
+    else if (binMin == 25. && binMax == 50.) return 1050.0;
+    else    return -1.0;
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -126,53 +147,6 @@ inline double GetSignificance(
 	return signif;
 }
 
-inline double GetChi2Ndf(
-	RooDataSet* ds,
-	RooAbsPdf* pdf,
-	RooRealVar* mass,
-	int nBins,
-	const char* rangeName = "",
-	RooFitResult* fitResult = nullptr,
-	RooWorkspace* ws = nullptr,
-	const char* wsVarName = "")
-{
-
-	const bool hasRange = (rangeName && rangeName[0] != '\0');
-	RooPlot* chi2Frame = mass->frame();
-	RooDataSet* dsForChi2 = ds;
-	if (hasRange) {dsForChi2 = static_cast<RooDataSet*>(ds->reduce(RooFit::CutRange(rangeName)));}
-
-	dsForChi2->plotOn(chi2Frame, RooFit::Name("chi2_data_tmp"), RooFit::Binning(nBins));
-	if (hasRange) { pdf->plotOn(chi2Frame, RooFit::Name("chi2_pdf_tmp"), RooFit::Range(rangeName), RooFit::NormRange(rangeName));}
-	else { pdf->plotOn(chi2Frame, RooFit::Name("chi2_pdf_tmp"), RooFit::Range(""), RooFit::NormRange(""));}
-
-	int nPar = 0;
-	if (fitResult) {
-		nPar = fitResult->floatParsFinal().getSize();
-	} else {
-		RooArgSet* pars = pdf->getParameters(*ds);
-		if (pars) {
-			RooAbsCollection* floatPars = pars->selectByAttrib("Constant", kFALSE);
-			if (floatPars) {
-				nPar = floatPars->getSize();
-				delete floatPars;
-			}
-			delete pars;
-		}
-	}
-
-	double chi2Ndf = chi2Frame->chiSquare("chi2_pdf_tmp", "chi2_data_tmp", nPar);
-	if (!std::isfinite(chi2Ndf) || chi2Ndf < 0) chi2Ndf = -1.0;
-
-	if (ws && wsVarName && wsVarName[0] != '\0') {
-		RooRealVar chi2Var(wsVarName, "", chi2Ndf);
-		ws->import(chi2Var);
-	}
-
-	delete chi2Frame;
-	if (dsForChi2 != ds) delete dsForChi2;
-	return chi2Ndf;
-}
 
 inline void setupLABELS(TLatex* latexTEXT, double tSize = 0.035, bool DrawText = true){
 	latexTEXT->SetNDC();
@@ -221,6 +195,22 @@ inline void DrawCmsHeader(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 struct SystVariationConfig {
 	std::string code;
 	std::string label;
@@ -237,7 +227,7 @@ inline std::vector<SystVariationConfig> GetBackgroundSystematicModels(const TStr
 	if (tree == "ntKp")  {//Exponential
 		return {{"2nd", "2nd-order Chebyshev + erfc"}, {"3rd", "3rd-order Chebyshev + erfc"}};
 	}
-	if (tree == "ntmix") {//3rd-order Chebyshev
+	if (tree == "ntmix" || tree == "ntmix_psi2s") {//3rd-order Chebyshev
 		return {{"4th", "4th-order Chebyshev"}};
 	}
 	return {};
@@ -255,11 +245,41 @@ inline std::vector<SystVariationConfig> GetSignalSystematicModels(const TString&
 	if (tree == "ntKp")  {// Double Gaussian
 		return {{"3gauss", "Triple Gaussian"}, {"gauss_cb", "Gaussian + Crystal Ball"}, {"fixed", "Fixed mean"}};
 	}
-	if (tree == "ntmix") {// Double Gaussian
+	if (tree == "ntmix" || tree == "ntmix_psi2s") {// Double Gaussian
 		return {{"1gauss", "Gaussian"}, {"3gauss", "Triple Gaussian"}};
 	}
 	return {};
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 inline std::string GetSystematicColumnLabel(const TString& var, double lowEdge, double highEdge)
 {
@@ -332,33 +352,36 @@ inline void latex_tables_document(
 	const std::vector<std::vector<std::vector<double> > >& numbers)
 {
 	std::ofstream file(filename + ".tex");
-	std::ofstream file_check(filename + "_check.tex");
 	file << std::fixed << std::setprecision(2);
-	file_check << std::fixed << std::setprecision(2);
 
-	file_check << "\\documentclass{article}" << std::endl;
-	file_check << "\\usepackage{geometry}" << std::endl;
-	file_check << "\\usepackage{booktabs}" << std::endl;
-	file_check << "\\geometry{a4paper, total={170mm,257mm}, left=20mm, top=20mm,}" << std::endl;
-	file_check << "\\begin{document}" << std::endl;
+	file << "\\documentclass{article}" << std::endl;
+	file << "\\usepackage{geometry}" << std::endl;
+	file << "\\usepackage{booktabs}" << std::endl;
+	file << "\\geometry{a4paper, total={170mm,257mm}, left=20mm, top=20mm,}" << std::endl;
+	file << "\\begin{document}" << std::endl;
 
 	for (size_t i = 0; i < n_cols.size(); ++i) {
 		latex_table_block(file, n_cols[i], n_lines[i], col_names[i], labels[i], numbers[i]);
-		latex_table_block(file_check, n_cols[i], n_lines[i], col_names[i], labels[i], numbers[i]);
 		if (i + 1 < n_cols.size()) {
-			file << std::endl << std::endl;
-			file_check << "\\vspace{0.5cm}" << std::endl;
+			file << "\\vspace{0.5cm}" << std::endl;
 		}
 	}
 
-	file_check << "\\end{document}" << std::endl;
+	file << "\\end{document}" << std::endl;
 	file.close();
-	file_check.close();
 
-	std::string pdfCmd = "pdflatex -interaction=nonstopmode -output-directory=./files " + filename + "_check.tex";
-	(void)system(pdfCmd.c_str());
-	std::remove((filename + "_check.aux").c_str());
-	std::remove((filename + "_check.log").c_str());
+	std::string outDir = ".";
+	size_t slashPos = filename.find_last_of("/\\");
+	if (slashPos != std::string::npos) outDir = filename.substr(0, slashPos);
+
+	std::cout << "Creating table pdf: " << filename << ".pdf" << std::endl;
+	std::string pdfCmd = "pdflatex -interaction=batchmode -halt-on-error -output-directory=" + outDir + " " + filename + ".tex > /dev/null 2>&1";
+	int pdfStatus = system(pdfCmd.c_str());
+	if (pdfStatus != 0) {
+		std::cerr << "pdflatex failed for " << filename << ".tex" << std::endl;
+	}
+	std::remove((filename + ".aux").c_str());
+	std::remove((filename + ".log").c_str());
 }
 
 inline void WriteSystematicsTablesDocument(

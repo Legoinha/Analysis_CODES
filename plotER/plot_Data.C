@@ -12,20 +12,19 @@
 
 #include "aux/parameters.h"
 #include "aux/masses.h"
+#include "aux/uti.h"
 
-void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb24"){
+void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin = -1){
     gStyle->SetOptStat(0);
 
     // Create a TChain and add all files from the directory
     TChain chain(Form("%s", TREE.Data()));
 
-    if(systemNAME.Contains("PbPb23")){//PbPb23 data
+    if(systemNAME.Contains("PbPb23")){        //PbPb23 data
         chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
-        //chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb24/pbpb23_24_comb.root");
-
     } else if(systemNAME.Contains("PbPb24")) {//PbPb24 data
         chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_DATA.root");
-    } else {//ppRef data
+    } else { //ppRef data
         if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root");}
         else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");}
         else if (TREE == "ntphi"){  chain.Add("/eos/user/h/hmarques/Analysis_CODES/plotER/Data_Bs.root");}
@@ -46,14 +45,10 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb24"){
     TString SELECTIONcuts = "1";
 
     if (TREE == "ntmix") {
-        SELECTIONcuts = "abs(By) < 1.2"
-                        "&& Bpt > 10 "
-                        "&& BQvalue < 0.2 "
-                        "&& CentBin > 20 "
-                        //"&& Bchi2Prob > 0.1"
-                        //"&& xgb_score > 0.5";
-                        "&& Btrk1dR < .25 && Btrk2dR < .25 "
-                        "&& BtrkPtimb > 0.15 ";
+        //SELECTIONcuts = "BQvalue < 0.1 "
+        //                "&& xgb_score > 0.45";
+        SELECTIONcuts = "1 "
+                        "&& xgb_score > 0.61 && BQvalue < 0.15";
     }
     else if (TREE != "ntmix"){ SELECTIONcuts = "Bnorm_svpvDistance_2D > 4" ;}
 
@@ -89,7 +84,7 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb24"){
 	sys_entries->SetLineWidth(2);
 	sys_entries->Draw();
 
-    if (true && TREE == "ntmix") {
+    if (false && TREE == "ntmix") {
         const double yMin = 0.0;
         const double yMax = hist_Bmass->GetMaximum() * 1.02;
 

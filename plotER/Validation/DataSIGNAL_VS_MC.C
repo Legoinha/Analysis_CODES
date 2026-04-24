@@ -39,6 +39,16 @@ struct VarCfgSignal {
 
 static constexpr int kNBins = 15;
 
+static bool isMixFamily(TString treeName)
+{
+    return (treeName == "ntmix" || treeName == "ntmix_psi2s");
+}
+
+static TString dataTreeName(TString treeName)
+{
+    return (treeName == "ntmix_psi2s") ? "ntmix" : treeName;
+}
+
 static TString makeTag(TString expr) {
     expr.ReplaceAll("(", "");
     expr.ReplaceAll(")", "");
@@ -80,7 +90,7 @@ static std::vector<VarCfgSignal> getSignalVars(TString treeName) {
         {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.25, false},
         {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.25, false}
     };
-    if (treeName == "ntmix") vars.insert(vars.begin() + 3, {"xgb_score", ";xgb_score;", kNBins, 0., 1.0, false});
+    if (isMixFamily(treeName)) vars.insert(vars.begin() + 3, {"xgb_score", ";xgb_score;", kNBins, 0., 1.0, false});
     return vars;
 }
 
@@ -152,24 +162,22 @@ static MassWindows windowsFromSigma(const SigmaInfo& s, double signalNSigma, dou
     return w;
 }
 
-static SigmaInfo extractSigmaFromModel(TString modelPath, TString treeName, bool isPsi2S = false)
+static SigmaInfo extractSigmaFromModel(TString modelPath, TString treeName)
 {
     SigmaInfo info = {0.0, 0.0, false};
     TString resolvedPath = resolveModelPath(modelPath, treeName);
     TFile* fModel = TFile::Open(resolvedPath, "READ");
     RooWorkspace* ws = (RooWorkspace*)fModel->Get("ws_nominal");
 
-    // inclusive naming convention (_count=1 and pdf="")
-    RooRealVar* meanVar  = ws->var(isPsi2S ? "mean_spec1_"     : "mean1_");
-    RooRealVar* sigma1   = ws->var(isPsi2S ? "sigma1_spec1_"   : "sigma11_");
-    RooRealVar* sigma2   = ws->var(isPsi2S ? "sigma2_spec1_"   : "sigma21_");
-    RooRealVar* sig1frac = ws->var(isPsi2S ? "sig1frac_spec1_" : "sig1frac1_");
-    RooRealVar* scale    = ws->var(isPsi2S ? "scale_spec"      : "scale");
-    if (isPsi2S && !scale) scale = ws->var("scale_specMC");
+    RooRealVar* meanVar  = ws->var("mean1_");
+    RooRealVar* sigma1   = ws->var("sigma11_");
+    RooRealVar* sigma2   = ws->var("sigma21_");
+    RooRealVar* sig1frac = ws->var("sig1frac1_");
+    RooRealVar* scale    = ws->var("scale");
     
     if (!meanVar || !sigma1 || !sigma2 || !sig1frac || !scale) {
         std::cout << "[extractSigmaFromModel] Could not extract "
-                  << (isPsi2S ? "psi(2S)" : "signal")
+                  << "signal"
                   << " parameters from workspace" << std::endl;
         fModel->Close();
         return info;
@@ -183,7 +191,6 @@ static SigmaInfo extractSigmaFromModel(TString modelPath, TString treeName, bool
     info.valid = true;
     
     std::cout << "[extractSigmaFromModel] " << treeName
-              << (isPsi2S ? " (psi2S)" : "")
               << ": mean=" << info.mean
               << ", effSigma=" << info.sigma << std::endl;
     
@@ -191,9 +198,10 @@ static SigmaInfo extractSigmaFromModel(TString modelPath, TString treeName, bool
     return info;
 }
 
-static TString particleLabel(TString treeName, bool isPsi2S = false)
+static TString particleLabel(TString treeName)
 {
-    if (treeName == "ntmix") return isPsi2S ? "#bf{#psi(2S)}" : "#bf{X(3872)}";
+    if (treeName == "ntmix") return "#bf{X(3872)}";
+    if (treeName == "ntmix_psi2s") return "#bf{#psi(2S)}";
     if (treeName == "ntKp") return "#bf{B^{+}}";
     if (treeName == "ntKstar") return "#bf{B^{0}}";
     if (treeName == "ntphi") return "#bf{B_{s}^{0}}";
@@ -202,7 +210,7 @@ static TString particleLabel(TString treeName, bool isPsi2S = false)
 
 static TString massFinalStateAxisTitle(TString treeName)
 {
-    if (treeName == "ntmix")   return "m_{J/#psi #pi^{-} #pi^{+}} [GeV/c^{2}]";
+    if (isMixFamily(treeName)) return "m_{J/#psi #pi^{-} #pi^{+}} [GeV/c^{2}]";
     if (treeName == "ntKp")    return "m_{J/#psi K^{+}} [GeV/c^{2}]";
     if (treeName == "ntphi")   return "m_{J/#psi K^{+} K^{-}} [GeV/c^{2}]";
     if (treeName == "ntKstar") return "m_{J/#psi #pi^{+} K^{-}} [GeV/c^{2}]";
@@ -253,41 +261,37 @@ void run_sideband_method(
     TFile* fMC   = TFile::Open(mcPath, "READ");
     TTree* tData = nullptr;
     TTree* tMC   = nullptr;
-    fData->GetObject(treeName, tData);
+    fData->GetObject(dataTreeName(treeName), tData);
     fMC->GetObject(treeName, tMC);
 
     // Region definition in sigma units
-    const double xSignalNSigma = 2.;   // X(3872)
-    const double psiSignalNSigma = 3.; // psi(2S)
+    const double signalNSigma = (treeName == "ntmix_psi2s") ? 3. : 2.;
     const double sidebandInNSigma = 4.;
     const double sidebandOutNSigma = 8.0;
 
-    TString sigLabelMainPlain = Form("Signal region (+/-%gsigma)", xSignalNSigma);
-    TString sigLabelPsiPlain  = Form("Signal region (+/-%gsigma)", psiSignalNSigma);
+    TString sigLabelPlain     = Form("Signal region (+/-%gsigma)", signalNSigma);
     TString sbLabelPlain      = Form("Sideband region (%g-%gsigma)", sidebandInNSigma, sidebandOutNSigma);
-    TString sigLabelMainRoot  = Form("Signal region (#pm%g#sigma)", xSignalNSigma);
-    TString sigLabelPsiRoot   = Form("Signal region (#pm%g#sigma)", psiSignalNSigma);
+    TString sigLabelRoot      = Form("Signal region (#pm%g#sigma)", signalNSigma);
     TString sbLabelRoot       = Form("Sideband region (%g-%g#sigma)", sidebandInNSigma, sidebandOutNSigma);
 
-    // Extract sigma information from model (main signal)
-    SigmaInfo sigInfo = extractSigmaFromModel(modelPath, treeName, false);
-    MassWindows wMain = windowsFromSigma(sigInfo, xSignalNSigma, sidebandInNSigma, sidebandOutNSigma);
-    if (!wMain.valid) {
+    SigmaInfo sigInfo = extractSigmaFromModel(modelPath, treeName);
+    MassWindows w = windowsFromSigma(sigInfo, signalNSigma, sidebandInNSigma, sidebandOutNSigma);
+    if (!w.valid) {
         Error("run_sideband_method", "Could not retrieve sigma-based regions for %s", treeName.Data());
         fData->Close();
         fMC->Close();
         return;
     }
 
-    const double sigLo = wMain.sigLo;
-    const double sigHi = wMain.sigHi;
-    const double sbLLo = wMain.sbLLo;
-    const double sbLHi = wMain.sbLHi;
-    const double sbRLo = wMain.sbRLo;
-    const double sbRHi = wMain.sbRHi;
+    const double sigLo = w.sigLo;
+    const double sigHi = w.sigHi;
+    const double sbLLo = w.sbLLo;
+    const double sbLHi = w.sbLHi;
+    const double sbRLo = w.sbRLo;
+    const double sbRHi = w.sbRHi;
 
     std::cout << "[run_sideband_method] Using sigma-based regions for " << treeName << std::endl;
-    std::cout << "  " << sigLabelMainPlain << ": [" << sigLo << ", " << sigHi << "]" << std::endl;
+    std::cout << "  " << sigLabelPlain << ": [" << sigLo << ", " << sigHi << "]" << std::endl;
     std::cout << "  " << sbLabelPlain << ": [" << sbLLo << ", " << sbLHi << "] U [" << sbRLo << ", " << sbRHi << "]" << std::endl;
 
     const double wSig = sigHi - sigLo;
@@ -303,11 +307,11 @@ void run_sideband_method(
     } else {
         cutSB = Form("(%s) && (Bmass>%f && Bmass<%f)", baseCut.Data(), sbRLo, sbRHi);
     }
-    TString cutMCSig = (treeName == "ntmix") ? Form("(%s) && (isX3872==1)", baseCut.Data()) : Form("(%s)", baseCut.Data());
+    TString cutMCSig = Form("(%s)", baseCut.Data());
 
     // Diagnostic plot: show mass windows used for sideband subtraction
-    double massMinPlot = (treeName == "ntmix") ? 3.6 : 5.0;
-    double massMaxPlot = (treeName == "ntmix") ? 4.0 : 5.8;
+    double massMinPlot = isMixFamily(treeName) ? 3.6 : 5.0;
+    double massMaxPlot = isMixFamily(treeName) ? 4.0 : 5.8;
     const int nMassBins = 80;
     TH1D* hMassWin = new TH1D("hMassWin_tmp", Form(";%s;", massFinalStateAxisTitle(treeName).Data()), nMassBins, massMinPlot, massMaxPlot);
     const double massBinWidthMeV = 1000.0 * (massMaxPlot - massMinPlot) / nMassBins;
@@ -348,9 +352,9 @@ void run_sideband_method(
     TLegend* legWin = new TLegend(0.62, 0.70, 0.90, 0.90);
     legWin->SetBorderSize(0);
     legWin->SetFillStyle(0);
-    legWin->SetHeader(particleLabel(treeName, false), "C");
+    legWin->SetHeader(particleLabel(treeName), "C");
     legWin->AddEntry(hMassWin, "Data", "lep");
-    legWin->AddEntry(bSig, sigLabelMainRoot, "f");
+    legWin->AddEntry(bSig, sigLabelRoot, "f");
     legWin->AddEntry(isNtKp ? bSBR : bSBL, sbLabelRoot, "f");
     legWin->Draw();
 
@@ -364,94 +368,6 @@ void run_sideband_method(
     delete hMassWin;
 
     TFile* fout = openLocalRootFile(Form("./bkgSub_%s.root", treeName.Data()), "RECREATE");
-    TFile* foutPsi = nullptr;
-    TString cutSigPsi = "";
-    TString cutSBPsi  = "";
-    TString cutMCPsi  = "";
-    double alphaPsi = alpha;
-    if (treeName == "ntmix") {
-        SigmaInfo psiInfo = extractSigmaFromModel(modelPath, treeName, true);
-        MassWindows wPsi = windowsFromSigma(psiInfo, psiSignalNSigma, sidebandInNSigma, sidebandOutNSigma);
-        if (!wPsi.valid) {
-            Error("run_sideband_method", "Could not retrieve sigma-based regions for psi(2S)");
-            fout->Close();
-            fData->Close();
-            fMC->Close();
-            return;
-        }
-
-        const double psiSigLo = wPsi.sigLo;
-        const double psiSigHi = wPsi.sigHi;
-        const double psiSBLLo = wPsi.sbLLo;
-        const double psiSBLHi = wPsi.sbLHi;
-        const double psiSBRLo = wPsi.sbRLo;
-        const double psiSBRHi = wPsi.sbRHi;
-
-        const double wSigPsi = psiSigHi - psiSigLo;
-        const double wSBPsi  = (psiSBLHi - psiSBLLo) + (psiSBRHi - psiSBRLo);
-        alphaPsi = (wSBPsi > 0.0 ? wSigPsi / wSBPsi : 0.0);
-
-        std::cout << "[run_sideband_method] Using sigma-based regions for psi(2S)" << std::endl;
-        std::cout << "  " << sigLabelPsiPlain << ": [" << psiSigLo << ", " << psiSigHi << "]" << std::endl;
-        std::cout << "  " << sbLabelPlain << ": [" << psiSBLLo << ", " << psiSBLHi << "] U [" << psiSBRLo << ", " << psiSBRHi << "]" << std::endl;
-
-        // Diagnostic plot for psi(2S) using model-derived windows
-        TH1D* hMassWinPsi = new TH1D("hMassWinPsi_tmp", Form(";%s;", massFinalStateAxisTitle(treeName).Data()), nMassBins, massMinPlot, massMaxPlot);
-        const double massBinWidthPsiMeV = 1000.0 * (massMaxPlot - massMinPlot) / nMassBins;
-        hMassWinPsi->GetYaxis()->SetTitle(Form("Entries / %.4g MeV/c^{2}", massBinWidthPsiMeV));
-        tData->Draw("Bmass>>hMassWinPsi_tmp", baseCut, "goff");
-
-        TCanvas* cWinPsi = new TCanvas(Form("cWinPsi_%s", treeName.Data()), "", 760, 650);
-        cWinPsi->SetLeftMargin(0.14);
-        hMassWinPsi->SetLineColor(kBlack);
-        hMassWinPsi->SetMarkerStyle(20);
-        hMassWinPsi->SetMarkerSize(0.7);
-        hMassWinPsi->Draw("E");
-
-        double yMaxWinPsi = hMassWinPsi->GetMaximum() * 1.15;
-        hMassWinPsi->SetMinimum(0.0);
-        hMassWinPsi->SetMaximum(yMaxWinPsi);
-
-        TBox* bSigPsi = new TBox(psiSigLo, 0.0, psiSigHi, yMaxWinPsi);
-        bSigPsi->SetFillColorAlpha(kRed + 1, 0.20);
-        bSigPsi->SetLineColor(kRed + 1);
-        bSigPsi->Draw("SAME");
-
-        TBox* bSBLPsi = new TBox(psiSBLLo, 0.0, psiSBLHi, yMaxWinPsi);
-        bSBLPsi->SetFillColorAlpha(kBlue + 1, 0.18);
-        bSBLPsi->SetLineColor(kBlue + 1);
-        bSBLPsi->Draw("SAME");
-
-        TBox* bSBRPsi = new TBox(psiSBRLo, 0.0, psiSBRHi, yMaxWinPsi);
-        bSBRPsi->SetFillColorAlpha(kBlue + 1, 0.18);
-        bSBRPsi->SetLineColor(kBlue + 1);
-        bSBRPsi->Draw("SAME");
-
-        hMassWinPsi->Draw("E SAME");
-
-        TLegend* legWinPsi = new TLegend(0.62, 0.70, 0.90, 0.90);
-        legWinPsi->SetBorderSize(0);
-        legWinPsi->SetFillStyle(0);
-        legWinPsi->SetHeader(particleLabel(treeName, true), "C");
-        legWinPsi->AddEntry(hMassWinPsi, "Data", "lep");
-        legWinPsi->AddEntry(bSigPsi, sigLabelPsiRoot, "f");
-        legWinPsi->AddEntry(bSBLPsi, sbLabelRoot, "f");
-        legWinPsi->Draw();
-
-        cWinPsi->SaveAs(Form("./BKGsub/%s/mass_windows_%s_psi2s.pdf", treeName.Data(), treeName.Data()));
-
-        delete legWinPsi;
-        delete bSigPsi;
-        delete bSBLPsi;
-        delete bSBRPsi;
-        delete cWinPsi;
-        delete hMassWinPsi;
-
-        cutSigPsi = Form("(%s) && (Bmass>%f && Bmass<%f)", baseCut.Data(), psiSigLo, psiSigHi);
-        cutSBPsi  = Form("(%s) && ((Bmass>%f && Bmass<%f) || (Bmass>%f && Bmass<%f))", baseCut.Data(), psiSBLLo, psiSBLHi, psiSBRLo, psiSBRHi);
-        cutMCPsi  = Form("(%s) && (isX3872==0)", baseCut.Data());
-        foutPsi = openLocalRootFile(Form("./bkgSub_%s_psi2s.root", treeName.Data()), "RECREATE");
-    }
 
     auto vars = getAvailableSignalVars(treeName, tData, tMC);
     for (const auto& v : vars) {
@@ -503,7 +419,7 @@ void run_sideband_method(
         TLegend* leg = new TLegend(0.65, 0.74, 0.90, 0.89);
         leg->SetBorderSize(0);
         leg->SetFillStyle(0);
-        leg->SetHeader(particleLabel(treeName, false), "C");
+        leg->SetHeader(particleLabel(treeName), "C");
         leg->AddEntry(hDataSub, "Sideband Subtraction (sig)", "lep");
         leg->AddEntry(hDataSBShape, "Sideband bkg", "lep");
         leg->AddEntry(hMCsig, "MC", "l");
@@ -526,79 +442,9 @@ void run_sideband_method(
         delete hMCsigBand;
         delete hMCsig;
 
-        if (foutPsi) {
-            TH1D* hDataSRPsi = new TH1D(Form("hDataSR_%s", tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            TH1D* hDataSBPsi = new TH1D(Form("hDataSB_%s", tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            TH1D* hMCPsi     = new TH1D(Form("hMCsig_%s",  tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            hMCPsi->Sumw2();
-
-            tData->Draw(Form("%s>>%s", expr.Data(), hDataSRPsi->GetName()), cutSigPsi, "goff");
-            tData->Draw(Form("%s>>%s", expr.Data(), hDataSBPsi->GetName()), cutSBPsi,  "goff");
-            tMC->Draw(Form("%s>>%s",   expr.Data(), hMCPsi->GetName()),     cutMCPsi,  "goff");
-
-            TH1D* hDataSubPsi = (TH1D*)hDataSRPsi->Clone(Form("hDataSub_%s", tag.Data()));
-            hDataSubPsi->Add(hDataSBPsi, -alphaPsi);
-            TH1D* hDataSBShapePsi = (TH1D*)hDataSBPsi->Clone(Form("hDataSBShape_%s", tag.Data()));
-
-            if (hDataSubPsi->Integral() > 0) hDataSubPsi->Scale(1.0 / hDataSubPsi->Integral());
-            if (hDataSBShapePsi->Integral() > 0) hDataSBShapePsi->Scale(1.0 / hDataSBShapePsi->Integral());
-            if (hMCPsi->Integral() > 0)      hMCPsi->Scale(1.0 / hMCPsi->Integral());
-
-            hDataSubPsi->SetLineColor(kBlack);
-            hDataSubPsi->SetMarkerColor(kBlack);
-            hDataSubPsi->SetMarkerStyle(20);
-            hDataSubPsi->SetLineWidth(2);
-            hDataSBShapePsi->SetLineColorAlpha(kGray + 1, 0.45);
-            hDataSBShapePsi->SetMarkerColorAlpha(kGray + 1, 0.45);
-            hDataSBShapePsi->SetMarkerStyle(21);
-            hDataSBShapePsi->SetLineWidth(1);
-            hMCPsi->SetLineColor(kOrange + 7);
-            hMCPsi->SetLineWidth(2);
-            TH1D* hMCPsiBand = makeMCUncBand(hMCPsi, Form("hMCPsiBand_%s", tag.Data()));
-
-            double ymaxPsi = std::max(hDataSubPsi->GetMaximum(), hMCPsi->GetMaximum());
-            ymaxPsi = std::max(ymaxPsi, hDataSBShapePsi->GetMaximum());
-            hDataSubPsi->SetMinimum(0.0);
-            hDataSubPsi->SetMaximum(1.35 * ymaxPsi);
-
-            TCanvas* cPsi = new TCanvas(Form("c_sb_psi_%s", tag.Data()), "", 760, 650);
-            cPsi->SetLeftMargin(0.14);
-            hDataSubPsi->Draw("E");
-            hDataSBShapePsi->Draw("E SAME");
-            hMCPsiBand->Draw("E2 SAME");
-            hMCPsi->Draw("HIST SAME");
-            hDataSubPsi->Draw("E SAME");
-
-            TLegend* legPsi = new TLegend(0.65, 0.70, 0.90, 0.89);
-            legPsi->SetBorderSize(0);
-            legPsi->SetFillStyle(0);
-            legPsi->SetHeader(particleLabel(treeName, true), "C");
-            legPsi->AddEntry(hDataSubPsi, "Sideband Subtraction (sig)", "lep");
-            legPsi->AddEntry(hDataSBShapePsi, "Sideband bkg", "lep");
-            legPsi->AddEntry(hMCPsi, "MC", "l");
-            legPsi->Draw();
-
-            cPsi->SaveAs(Form("./BKGsub/%s/%s_bkgSub_psi2s.pdf", treeName.Data(), tag.Data()));
-
-            foutPsi->cd();
-            hDataSRPsi->Write();
-            hDataSBPsi->Write();
-            hDataSubPsi->Write();
-            hMCPsi->Write();
-
-            delete legPsi;
-            delete cPsi;
-            delete hDataSRPsi;
-            delete hDataSBPsi;
-            delete hDataSubPsi;
-            delete hDataSBShapePsi;
-            delete hMCPsiBand;
-            delete hMCPsi;
-        }
     }
 
     fout->Close();
-    if (foutPsi) foutPsi->Close();
     fData->Close();
     fMC->Close();
 }
@@ -631,7 +477,7 @@ void run_splot_method(
     }
     TTree* tData = nullptr;
     TTree* tMC   = nullptr;
-    fData->GetObject(treeName, tData);
+    fData->GetObject(dataTreeName(treeName), tData);
     fMC->GetObject(treeName, tMC);
     RooWorkspace* ws = (RooWorkspace*)fModel->Get("ws_nominal");
     if (!tData || !tMC || !ws) {
@@ -641,8 +487,15 @@ void run_splot_method(
         fModel->Close();
         return;
     }
-    double massMin = (treeName == "ntmix") ? 3.6 : 5.0;
-    double massMax = (treeName == "ntmix") ? 4.0 : 5.8;
+    double massMin = 5.0;
+    double massMax = 5.8;
+    if (treeName == "ntmix") {
+        massMin = 3.8;
+        massMax = 4.0;
+    } else if (treeName == "ntmix_psi2s") {
+        massMin = 3.6;
+        massMax = 3.8;
+    }
 
     auto vars = getAvailableSignalVars(treeName, tData, tMC);
 
@@ -668,7 +521,6 @@ void run_splot_method(
     RooDataSet data("data", "data", tData, obs, dataCut.Data());
     RooAbsPdf* model = ws->pdf("model1_");
     RooRealVar* nsig = ws->var("nsig1_");
-    RooRealVar* npsi = ws->var("nsig_spec1_");
     RooRealVar* nbkg = ws->var("nbkg1_");
     RooRealVar* nbkgPartR = ws->var("nbkg_part_r1_");
     if (!model || !nsig || !nbkg) {
@@ -680,7 +532,6 @@ void run_splot_method(
     }
 
     ensureSPlotYieldRange(nsig);
-    ensureSPlotYieldRange(npsi);
     ensureSPlotYieldRange(nbkg);
     ensureSPlotYieldRange(nbkgPartR);
 
@@ -693,7 +544,6 @@ void run_splot_method(
         v->setConstant(true);
     }
     nsig->setConstant(false);
-    if (npsi) npsi->setConstant(false);
     nbkg->setConstant(false);
     if (nbkgPartR) nbkgPartR->setConstant(false);
 
@@ -701,7 +551,6 @@ void run_splot_method(
 
     RooArgList splotYields;
     splotYields.add(*nsig);
-    if (npsi) splotYields.add(*npsi);
     if (nbkgPartR) splotYields.add(*nbkgPartR);
     splotYields.add(*nbkg);
     RooStats::SPlot sData("sData", "An SPlot", data, model, splotYields);
@@ -745,9 +594,7 @@ void run_splot_method(
     cMass->SaveAs(Form("./SPLOT/%s/massFit_splot_%s.pdf", treeName.Data(), treeName.Data()));
 
     TFile* fout = openLocalRootFile(Form("./splot_%s.root", treeName.Data()), "RECREATE");
-    TFile* foutPsi = (treeName == "ntmix" && npsi) ? openLocalRootFile(Form("./splot_%s_psi2s.root", treeName.Data()), "RECREATE") : nullptr;
-    TString mcCut = (treeName == "ntmix") ? Form("(%s) && (isX3872==1)", baseCut.Data()) : Form("(%s)", baseCut.Data());
-    TString mcCutPsi = (treeName == "ntmix") ? Form("(%s) && (isX3872==0)", baseCut.Data()) : Form("(%s)", baseCut.Data());
+    TString mcCut = Form("(%s)", baseCut.Data());
 
     for (const auto& v : vars) {
         TString exprPlot = v.absVal ? Form("abs(%s)", v.expr.Data()) : v.expr;
@@ -800,7 +647,7 @@ void run_splot_method(
         TLegend* leg = new TLegend(0.65, 0.70, 0.90, 0.89);
         leg->SetBorderSize(0);
         leg->SetFillStyle(0);
-        leg->SetHeader(particleLabel(treeName, false), "C");
+        leg->SetHeader(particleLabel(treeName), "C");
         leg->AddEntry(hDataSPlot, "sPlot (sig)", "lep");
         leg->AddEntry(hMCsig, "MC", "l");
         leg->Draw();
@@ -819,76 +666,9 @@ void run_splot_method(
         delete hMCsigBand;
         delete hMCsig;
 
-        if (foutPsi) {
-            TH1D* hDataSPlotPsi = new TH1D(Form("hDataSPlot_%s", tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            TH1D* hDataBkgSPlotPsi = new TH1D(Form("hDataBkgSPlot_%s", tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            TH1D* hMCPsi        = new TH1D(Form("hMCsig_%s",      tag.Data()), v.title, v.nbins, v.xmin, v.xmax);
-            hMCPsi->Sumw2();
-
-            for (int i = 0; i < data.numEntries(); ++i) {
-                const RooArgSet* row = data.get(i);
-                if (!row) continue;
-                double val = row->getRealValue(baseVar.Data());
-                if (v.absVal) val = std::abs(val);
-                double w = row->getRealValue(Form("%s_sw", npsi->GetName()));
-                hDataSPlotPsi->Fill(val, w);
-                double wb = row->getRealValue(Form("%s_sw", nbkg->GetName()));
-                if (nbkgPartR) wb += row->getRealValue(Form("%s_sw", nbkgPartR->GetName()));
-                hDataBkgSPlotPsi->Fill(val, wb);
-            }
-
-            TString mcExprPsi = v.absVal ? Form("abs(%s)", v.expr.Data()) : v.expr;
-            tMC->Draw(Form("%s>>%s", mcExprPsi.Data(), hMCPsi->GetName()), mcCutPsi, "goff");
-
-            if (hDataSPlotPsi->Integral() > 0) hDataSPlotPsi->Scale(1.0 / hDataSPlotPsi->Integral());
-            if (hDataBkgSPlotPsi->Integral() > 0) hDataBkgSPlotPsi->Scale(1.0 / hDataBkgSPlotPsi->Integral());
-            if (hMCPsi->Integral() > 0)        hMCPsi->Scale(1.0 / hMCPsi->Integral());
-
-            hDataSPlotPsi->SetLineColor(kBlue + 1);
-            hDataSPlotPsi->SetMarkerColor(kBlue + 1);
-            hDataSPlotPsi->SetMarkerStyle(24);
-            hDataSPlotPsi->SetLineWidth(2);
-            hMCPsi->SetLineColor(kOrange + 7);
-            hMCPsi->SetLineWidth(2);
-            TH1D* hMCPsiBand = makeMCUncBand(hMCPsi, Form("hMCPsiBand_sp_%s", tag.Data()));
-
-            double ymaxPsi = std::max(hDataSPlotPsi->GetMaximum(), hMCPsi->GetMaximum());
-            hDataSPlotPsi->SetMinimum(0.0);
-            hDataSPlotPsi->SetMaximum(1.35 * ymaxPsi);
-
-            TCanvas* cPsi = new TCanvas(Form("c_sp_psi_%s", tag.Data()), "", 760, 650);
-            cPsi->SetLeftMargin(0.14);
-            hDataSPlotPsi->Draw("E");
-            hMCPsiBand->Draw("E2 SAME");
-            hMCPsi->Draw("HIST SAME");
-            hDataSPlotPsi->Draw("E SAME");
-
-            TLegend* legPsi = new TLegend(0.65, 0.70, 0.90, 0.89);
-            legPsi->SetBorderSize(0);
-            legPsi->SetFillStyle(0);
-            legPsi->SetHeader(particleLabel(treeName, true), "C");
-            legPsi->AddEntry(hDataSPlotPsi, "sPlot (sig)", "lep");
-            legPsi->AddEntry(hMCPsi, "MC", "l");
-            legPsi->Draw();
-
-            cPsi->SaveAs(Form("./SPLOT/%s/%s_splot_psi2s.pdf", treeName.Data(), tag.Data()));
-
-            foutPsi->cd();
-            hDataSPlotPsi->Write();
-            hDataBkgSPlotPsi->Write();
-            hMCPsi->Write();
-
-            delete legPsi;
-            delete cPsi;
-            delete hDataSPlotPsi;
-            delete hDataBkgSPlotPsi;
-            delete hMCPsiBand;
-            delete hMCPsi;
-        }
     }
 
     fout->Close();
-    if (foutPsi) foutPsi->Close();
     delete frame;
     delete cMass;
     if (fitRes) delete fitRes;
@@ -915,6 +695,8 @@ void run_compare_methods(
 
     auto vars = getSignalVars(treeName);
     for (const auto& v : vars) {
+        TString baseVar = baseVarFromExpr(v.expr);
+        if (baseVar == "Bnorm_trk1Dxy" || baseVar == "Balpha") continue;
         TString exprPlot = v.absVal ? Form("abs(%s)", v.expr.Data()) : v.expr;
         TString tag = makeTag(exprPlot);
         TString label = v.expr;
@@ -1010,7 +792,7 @@ void run_compare_methods(
         TLegend* leg = new TLegend(0.7, 0.68, 0.9, 0.9);
         leg->SetBorderSize(0);
         leg->SetFillStyle(0);
-        leg->SetHeader(particleLabel(treeName, suffix.Contains("psi2s")), "C");
+        leg->SetHeader(particleLabel(treeName), "C");
         leg->AddEntry(hMC, "MC", "l");
         leg->AddEntry(hSB, "Sideband Subtraction (sig)", "lep");
         leg->AddEntry(hSP, "sPlot (sig)", "lep");
@@ -1061,7 +843,7 @@ void run_compare_methods(
 
 void DataSIGNAL_VS_MC(
     TString dataPath  = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root",
-    TString mcPath    = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore.root",
+    TString mcPath    = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore_X3872.root",
     TString modelPath = "../fitER/ROOTfiles/nominalFitModel_ntmix_ppRef.root",
     TString baseCut   = "xgb_score > 0.61 && BQvalue<0.15",
     TString treeName  = "ntmix")
@@ -1075,8 +857,5 @@ void DataSIGNAL_VS_MC(
     run_sideband_method(dataPath, mcPath, modelPath, baseCut, treeName);
     run_splot_method(dataPath, mcPath, modelPath, baseCut, treeName);
     run_compare_methods(Form("./bkgSub_%s.root", treeName.Data()), Form("./splot_%s.root", treeName.Data()), treeName, "");
-    if (treeName == "ntmix") {
-        run_compare_methods(Form("./bkgSub_%s_psi2s.root", treeName.Data()), Form("./splot_%s_psi2s.root", treeName.Data()), treeName, "_psi2s");
-    }
     std::cout << "Done. Outputs: ./bkgSub_" << treeName << ".root, ./splot_" << treeName << ".root and ./COMPARE/" << treeName << "/*.pdf" << std::endl;
 }

@@ -18,8 +18,8 @@ mkdir -p ROOTfiles/
 
 #The Function to be called:
 #
-#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString OUTPLOTF = "", TString ExtraMCsample = "", TString SYSTEM = "ppRef"){
-#
+#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef"){
+
 
 
 if [ $DOANALYSISPbPb_FULL_Bp  -eq 1  ]; then
@@ -29,8 +29,6 @@ root -b -q "roofitB.C++(\"ntKp\", \
                       \"$MC_Bp\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"results/Bp/Bpt\", \
-                      \" \", \
                       \"$syst\")"
 fi
 
@@ -41,8 +39,6 @@ root -b -q "roofitB.C++(\"ntKp\",\
                       \"$MC_Bp\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"results/Bp/Bpt\", \
-                      \" \", \
                       \"$syst\")"
 fi
 
