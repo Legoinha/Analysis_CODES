@@ -38,6 +38,31 @@ Matching rules:
 - `MC` with `TREE=ntmix` and `PVSNP="_nonPrompt"`: the filename must match `MC`, `SYSTEM`, `TREE`, and `PARTICLE`, and must contain `nonprompt`
 - `MC` with `TREE!=ntmix`: the filename must match `MC`, `SYSTEM`, and `TREE`
 
+Important details:
+
+- `run_flat.sh` does not take a filelist path directly
+- it looks inside `flatER/filelists/DATA/` or `flatER/filelists/MC/`
+- your `.txt` files must be placed in the right subfolder, with names that match the requested case
+
+For example, with:
+
+```bash
+bash run_flat.sh PbPb24 DATA ntmix "" ""
+```
+
+the script will pick `.txt` files in `flatER/filelists/DATA/` whose names contain:
+
+- `DATA`
+- `PbPb24`
+
+So names like these are good:
+
+```text
+DATA_PbPb24_00.txt
+DATA_PbPb24_01.txt
+...
+```
+
 Workflow:
 
 1. `run_flat.sh` scans `filelists/DATA` or `filelists/MC`

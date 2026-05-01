@@ -1,5 +1,6 @@
 #include <TFile.h>
 #include <TTree.h>
+#include <TChain.h>
 #include <TCanvas.h>
 #include <TH1F.h>
 #include <TBox.h>
@@ -31,17 +32,19 @@ TString getPlotParticleLabel(TString treeName){
     return treeName;
 }
 
-void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
+void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "PbPb")
 {
     gSystem->Exec("mkdir -p ./presel_STUDY_vars/");
 
     //VARIABLES
     //VARIABLES
     //VARIABLES
-    const char * variables[] = {"Bmass", "abs(BLxy)",  "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",    "Bpt",     "BQvalue",   "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D", "xgb_score" };
-    const double ranges[][2] = {{3.6,4},    {0,0.1},             {0,0.25},    {0,2.4},         {0,1},   {0,50},     {0.0,0.6},         {0.95,1},    {0,0.8},     {0.0,1},     {0,1.5},    {0.5,4.5},    {0.5,4.5},          {0,20},   {0,1}};    
+    const char * variables[] = {"Bmass", "abs(BLxy)",  "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",    "Bpt",     "BQvalue",   "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk2dR", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D", "xgb_score" };
+    const double ranges[][2] = {{3.6,4},    {0,0.1},             {0,0.25},    {0,2.4},         {0,1},   {0,50},     {0.0,0.6},         {0.95,1},    {0,0.8},     {0.0,1},   {0,1.5},   {0,1.5},    {0.5,4.5},    {0.5,4.5},          {0,20},   {0,1}};    
     //const char * variables[] = {"BQvalue"};
     //const double ranges[][2] = {{0,0.6}};
+    //const char * variables[] = {"Btrk1dR","Btrk2dR",};
+    //const double ranges[][2] = {{0,1.5}, {0,1.5}};
     
     //VARIABLES
     //VARIABLES
@@ -51,8 +54,6 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
     TString mcTreeName = TREE;
     TString mcTreeNameSpec = TREE;
 
-    TChain chain(dataTreeName.Data());
-
     ////// OPEN FILES (MC AND DATA) //////
     ////// OPEN FILES (MC AND DATA) //////
     TTree *tree_MC = nullptr;
@@ -61,15 +62,17 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
     TString path_to_MC   = "";
     TString path_to_MC_spec = "";
     TString baseDir = "";
-    if (TREE == "ntmix") {
-        path_to_MC = Form("./../flatER/X3872/flat_ntmix_%s_MC_X3872.root", systemNAME.Data());
-        path_to_MC_spec = Form("./../flatER/X3872/flat_ntmix_%s_MC_PSI2S.root", systemNAME.Data());
-        mcTreeNameSpec = "ntmix_psi2s";
-        path_to_data = Form("./../flatER/X3872/flat_ntmix_%s_DATA.root",  systemNAME.Data());
+    if (TREE == "ntmix_X3872") {
+        dataTreeName = "ntmix";
+        path_to_MC = Form("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb23_scored_MC_X3872.root");
+        path_to_MC_spec = Form("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb23_scored_MC_PSI2S.root");
+        mcTreeNameSpec = "ntmix_PSI2S";
+        path_to_data = Form("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb_scored_DATA.root");
     } else {
         path_to_MC = Form("./../flatER/Bmeson/flat_%s_%s_MC.root", TREE.Data(), systemNAME.Data());
         path_to_data = Form("./../flatER/Bmeson/flat_%s_%s_DATA.root", dataTreeName.Data(), systemNAME.Data());
     }
+    TChain chain(dataTreeName.Data());
     chain.Add(path_to_data);
     ////// OPEN FILES (MC AND DATA) //////
     ////// OPEN FILES (MC AND DATA) //////
@@ -98,7 +101,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
         double hist_Xhigh      = ranges[i][1];
         double hist_Xlow       = ranges[i][0];
         if (var == "Bmass") {
-            if (dataTreeName == "ntmix") {hist_Xlow = 3.6; hist_Xhigh = 4.0;}
+            if (TREE == "ntmix_X3872") {hist_Xlow = 3.6; hist_Xhigh = 4.0;}
             else {hist_Xlow = 5.05; hist_Xhigh = 5.8;}
         }
         double bin_length_MEV  = (hist_Xhigh - hist_Xlow) / nbinsVARhistos;
@@ -108,7 +111,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
             if (TREE == "ntKp")        {Xlabel = "m_{J/#Psi K^{+}} [GeV/c^{2}]";}
             else if (TREE == "ntKstar"){Xlabel = "m_{J/#Psi K^{+} #pi^{-}} [GeV/c^{2}]";}
             else if (TREE == "ntphi")  {Xlabel = "m_{J/#Psi K^{+} K^{-}} [GeV/c^{2}]";}
-            else if (dataTreeName == "ntmix")  {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} [GeV/c^{2}]";}
+            else if (TREE == "ntmix_X3872")  {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} [GeV/c^{2}]";}
         }
         else if (var == "Bpt"){Xlabel = "p_{T} [GeV/c]";}
         else {                 Xlabel = var.Data();}
@@ -119,10 +122,10 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
         TH1F *hist_spec = new TH1F("hist_spec", Form("; %s; Entries / %.3f ", Xlabel.Data(), bin_length_MEV) , nbinsVARhistos, hist_Xlow ,hist_Xhigh);
                
         TString sideband = "1";
-        if(dataTreeName == "ntmix"){ sideband = " (Bmass > 3.95 && Bmass < 4.00)";}
+        if(TREE == "ntmix_X3872"){ sideband = "(((Bmass > 3.95) & (Bmass < 4.00)) || ((Bmass > 3.75) & (Bmass < 3.80)) || ((Bmass > 3.60) & (Bmass < 3.625)))";}
         else {sideband = "(Bmass > 5.55)";}
 
-        TString ANYsel = "1" ;//"xgb_score > 0.55"; // customize if needed
+        TString ANYsel = "xgb_score > 0.85 & abs(By) < 1.2 & Bpt > 15  & CentBin > 10" ;//"5"; // customize if needed
 
         tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), Form(" %s ", ANYsel.Data()));
         chain.Draw(Form("%s >> hist_BKG", var.Data()), Form(" %s && %s ", sideband.Data(), ANYsel.Data()));
@@ -177,7 +180,7 @@ void plot_dataMC(TString TREE ="ntmix", TString systemNAME = "ppRef")
         leg->SetFillStyle(0);
         leg->SetTextSize(0.035);
         leg->SetHeader(Form("#bf{%s}, %s", systemNAME.Data(), ANYsel.Data()));
-        if (TREE == "ntmix") leg->AddEntry(hist_SIG, "X(3872) MC", "l");
+        if (TREE == "ntmix_X3872") leg->AddEntry(hist_SIG, "X(3872) MC", "l");
         else leg->AddEntry(hist_SIG, Form("%s MC", getPlotParticleLabel(TREE).Data()), "l");
         if (tree_MC_spec) {
             leg->AddEntry(hist_spec, "#Psi(2S) MC", "l");

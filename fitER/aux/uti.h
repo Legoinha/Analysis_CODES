@@ -77,7 +77,7 @@ using namespace std;
 
 inline double GetNtmixDataYmax(float binMin, float binMax)
 {
-    if (binMin == 5. && binMax == 50.) return 7300.0;
+    if (binMin == 10. && binMax == 50.) return 11000.0;
     else if (binMin == 5. && binMax == 10.) return 200.0;
     else if (binMin == 10. && binMax == 15.) return 2400.0;
     else if (binMin == 15. && binMax == 25.) return 3700.0;
@@ -227,7 +227,7 @@ inline std::vector<SystVariationConfig> GetBackgroundSystematicModels(const TStr
 	if (tree == "ntKp")  {//Exponential
 		return {{"2nd", "2nd-order Chebyshev + erfc"}, {"3rd", "3rd-order Chebyshev + erfc"}};
 	}
-	if (tree == "ntmix" || tree == "ntmix_psi2s") {//3rd-order Chebyshev
+	if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") {//3rd-order Chebyshev
 		return {{"4th", "4th-order Chebyshev"}};
 	}
 	return {};
@@ -245,7 +245,7 @@ inline std::vector<SystVariationConfig> GetSignalSystematicModels(const TString&
 	if (tree == "ntKp")  {// Double Gaussian
 		return {{"3gauss", "Triple Gaussian"}, {"gauss_cb", "Gaussian + Crystal Ball"}, {"fixed", "Fixed mean"}};
 	}
-	if (tree == "ntmix" || tree == "ntmix_psi2s") {// Double Gaussian
+	if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") {// Double Gaussian
 		return {{"1gauss", "Gaussian"}, {"3gauss", "Triple Gaussian"}};
 	}
 	return {};

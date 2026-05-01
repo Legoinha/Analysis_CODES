@@ -13,8 +13,8 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	double init_mean = Bs_MASS;
 	if (tree == "ntKp") init_mean = Bu_MASS;
 	else if (tree == "ntKstar") init_mean = Bd_MASS;
-	else if (tree == "ntmix") init_mean = X3872_MASS;
-	else if (tree == "ntmix_psi2s") init_mean = PSI2S_MASS;
+	else if (tree == "ntmix_X3872") init_mean = X3872_MASS;
+	else if (tree == "ntmix_PSI2S") init_mean = PSI2S_MASS;
 
 	RooRealVar mean(Form("mean%d_%s", _count, pdf.Data()), "", init_mean, init_mean - 0.01, init_mean + 0.01);
 	RooRealVar sigma1(Form("sigma1%d_%s", _count, pdf.Data()), "", 0.01, 0.001, 0.1);
@@ -47,8 +47,8 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 
 	mass->setRange("signal", init_mean - 0.07, init_mean + 0.07);
 	if (tree == "ntKp") mass->setRange("signal", init_mean - 0.1, init_mean + 0.1);
-	else if (tree == "ntmix") mass->setRange("signal", init_mean - 0.035, init_mean + 0.035);
-	else if (tree == "ntmix_psi2s") mass->setRange("signal", init_mean - 0.03, init_mean + 0.03);
+	else if (tree == "ntmix_X3872") mass->setRange("signal", init_mean - 0.035, init_mean + 0.035);
+	else if (tree == "ntmix_PSI2S") mass->setRange("signal", init_mean - 0.03, init_mean + 0.03);
 
 	RooFitResult* fitResultMC = modelMC->fitTo(*dsMC, Save(), Extended(), Range("signal"));
 	w.import(*nsigMC);
@@ -71,7 +71,7 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	else if (tree == "ntKstar") { xMinPlot = 5.05; xMaxPlot = 5.55; }
 
 	TString xTtile_decayC = "";
-	if (tree == "ntmix" || tree == "ntmix_psi2s") xTtile_decayC = "m_{J/#psi #pi^{+} #pi^{-}} [GeV/c^{2}]";
+	if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") xTtile_decayC = "m_{J/#psi #pi^{+} #pi^{-}} [GeV/c^{2}]";
 	else if (tree == "ntphi") xTtile_decayC = "m_{J/#psi K^{+} K^{-}} [GeV/c^{2}]";
 	else if (tree == "ntKstar") xTtile_decayC = "m_{J/#psi #pi^{+} K^{-}} [GeV/c^{2}]";
 	else if (tree == "ntKp") xTtile_decayC = "m_{J/#psi K^{+}} [GeV/c^{2}]";
@@ -115,12 +115,12 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	if (tree == "ntphi") ident_par = "B^{0}_{s}";
 	else if (tree == "ntKp") ident_par = "B^{+}";
 	else if (tree == "ntKstar") ident_par = "B^{0}";
-	else if (tree == "ntmix") ident_par = "X(3872)";
-	else if (tree == "ntmix_psi2s") ident_par = "#psi(2S)";
+	else if (tree == "ntmix_X3872") ident_par = "X(3872)";
+	else if (tree == "ntmix_PSI2S") ident_par = "#psi(2S)";
 	legMC->AddEntry(frameMC->findObject(Form("sigMC%d_%s", _count, pdf.Data())), Form("%s, %s ", ident_par.Data(), pdf.Data()), "f");
 	legMC->Draw();
 
-	double n_signal_initial = ds->sumEntries(TString::Format("abs(Bmass-%g)<%g", init_mean, (tree == "ntmix" || tree == "ntmix_psi2s") ? 0.005 : 0.05));
+	double n_signal_initial = ds->sumEntries(TString::Format("abs(Bmass-%g)<%g", init_mean, (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") ? 0.005 : 0.05));
 	RooRealVar nsig(Form("nsig%d_%s", _count, pdf.Data()), "", n_signal_initial * 0.4, n_signal_initial * 0.2, n_signal_initial * 1.5);
 
 	RooRealVar nbkg(Form("nbkg%d_%s", _count, pdf.Data()), "", ds->sumEntries() * 0.7, ds->sumEntries() * 0.1, ds->sumEntries());
@@ -140,7 +140,7 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	RooGenericPdf* erfc = new RooGenericPdf(Form("erfc%d", _count), "0.5*TMath::Erfc((@0-@2)/@1)", RooArgList(*mass, *m_nonprompt_scale, *m_nonprompt_shift));
 
 	RooAddPdf* model = nullptr;
-	if (tree == "ntmix" || tree == "ntmix_psi2s") {
+	if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") {
 		if ((variation == "" && pdf == "") || variation == "signal") model = new RooAddPdf(Form("model%d_%s", _count, pdf.Data()), "", RooArgList(*sig, bkg_3rd), RooArgList(nsig, nbkg));
 		if (variation == "background" && pdf == "4th") model = new RooAddPdf(Form("model%d_%s", _count, pdf.Data()), "", RooArgList(*sig, bkg_4th), RooArgList(nsig, nbkg));
 	}
@@ -200,7 +200,7 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	frame->GetYaxis()->SetLabelFont(42);
 	frame->GetXaxis()->SetLabelSize(0);
 	frame->GetYaxis()->SetLabelSize(0.035);
-	if (tree == "ntmix" || tree == "ntmix_psi2s" && true) { frame->GetYaxis()->SetRangeUser(0.0, GetNtmixDataYmax(binmin, binmax));}	
+	if ((tree == "ntmix_X3872" || tree == "ntmix_PSI2S") && true) { frame->GetYaxis()->SetRangeUser(0.0, GetNtmixDataYmax(binmin, binmax));}	
 	TPad* p1 = new TPad("p1", "p1", 0., 0.22, 1., 1);
 	p1->SetBorderMode(1);
 	p1->SetFrameBorderMode(0);
@@ -233,7 +233,7 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	frame->Draw();
 
 	TLegend* leg = new TLegend(0.68, 0.60, 0.92, 0.90, NULL, "brNDC");
-	if (tree != "ntKp" && tree != "ntmix") leg = new TLegend(0.68, 0.66, 0.92, 0.90, NULL, "brNDC");
+	if (tree != "ntKp" && tree != "ntmix_X3872") leg = new TLegend(0.68, 0.66, 0.92, 0.90, NULL, "brNDC");
 	leg->SetBorderSize(0);
 	leg->SetFillStyle(0);
 	leg->SetTextSize(0.035);
@@ -244,9 +244,9 @@ RooFitResult *fit(TString variation, TString pdf, TString tree, TCanvas* c, TCan
 	if (tree == "ntKp") {
 		leg->AddEntry(frame->findObject(Form("sig%d_%s", _count, pdf.Data())), " B^{+} #rightarrow J/#psi K^{+}", "f");
 		leg->AddEntry(frame->findObject(Form("erfc%d_%s", _count, pdf.Data())), " B #rightarrow J/#psi X", "l");
-	} else if (tree == "ntmix") {
+	} else if (tree == "ntmix_X3872") {
 		leg->AddEntry(frame->findObject(Form("sig%d_%s", _count, pdf.Data())), " X(3872) #rightarrow J/#psi #pi^{+} #pi^{-}", "f");
-	} else if (tree == "ntmix_psi2s") {
+	} else if (tree == "ntmix_PSI2S") {
 		leg->AddEntry(frame->findObject(Form("sig%d_%s", _count, pdf.Data())), " #psi(2S) #rightarrow J/#psi #pi^{+} #pi^{-}", "f");
 	} else if (tree == "ntphi") {
 		leg->AddEntry(frame->findObject(Form("sig%d_%s", _count, pdf.Data())), " B_{s}^{0} #rightarrow J/#psi K^{+}K^{-}", "f");

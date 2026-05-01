@@ -20,19 +20,19 @@ def get_particle_label(tree_name):
     
 
 def resolve_paths(tree_name, system_name):
-    base_dir = "/eos/user/h/hmarques/Analysis_CODES/flatER"
+    base_dir = "/eos/user/h/hmarques/Analysis_CODES"
 
     if tree_name in ("X3872", "Psi2S"):
         data_tree = "ntmix"
-        mc_tree = "ntmix_psi2s" if tree_name == "Psi2S" else "ntmix"
+        mc_tree = "ntmix_PSI2S" if tree_name == "Psi2S" else "ntmix_X3872"
         mc_tag = "PSI2S" if tree_name == "Psi2S" else tree_name
-        path_to_data = f"{base_dir}/X3872/flat_ntmix_{system_name}_DATA.root"
-        path_to_mc = f"{base_dir}/X3872/flat_ntmix_{system_name}_MC_{mc_tag}.root"
+        path_to_data = f"{base_dir}/selectionER/scored_samples/flat_ntmix_{system_name}_scored_DATA.root"
+        path_to_mc = f"{base_dir}/selectionER/scored_samples/flat_ntmix_{system_name}_scored_MC_{mc_tag}.root"
     else:
         data_tree = tree_name
         mc_tree = tree_name
-        path_to_data = f"{base_dir}/Bmeson/flat_{tree_name}_{system_name}_DATA.root"
-        path_to_mc = f"{base_dir}/Bmeson/flat_{tree_name}_{system_name}_MC.root"
+        path_to_data = f"{base_dir}/flatER/Bmeson/flat_{tree_name}_{system_name}_DATA.root"
+        path_to_mc = f"{base_dir}/flatER/Bmeson/flat_{tree_name}_{system_name}_MC.root"
 
     return path_to_data, path_to_mc, data_tree, mc_tree
 

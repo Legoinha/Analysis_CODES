@@ -18,8 +18,8 @@
 void plot2D_dataMC(TString TREE = "ntKstar", TString systemNAME = "ppRef")
 {
     // Variables list and ranges (per variable) — order matters                                                 #{1.004,1.035}
-    static const char* variables[]  = {  "BtrkminPt", "Bmass", "Btktkpt", "Bujmass",  "Bpt", "abs(By)", "Balpha", "BQvalue",      "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2cl", "Btrk1dR", "Btrk1Pt","Btrk2Pt", "Bnorm_svpvDistance_2D", "Bnorm_trk1Dxy"};
-    static const double ranges[][2] = {       {0.5,4},   {5 , 6},    {0,15}, {2.9,3.25}, {0, 50},   {0, 2.4}, {0, 3.15},     {0.5,1.5}, {0.75,1.05}, {0.995,1},                {0,0.9}, {0.05,1}, {0,1}, {0.5,5},{0.5,5}, {0,15}, {-11,11} };
+    static const char* variables[]  = {  "BtrkminPt",  "Bmass",   "Btktkpt",    "Bujmass",   "Bpt",  "abs(By)",  "Balpha",     "BQvalue",      "Btktkmass", "Bcos_dtheta", "BtrkPtimb", "Bchi2cl", "Btrk1dR", "Btrk1Pt","Btrk2Pt", "Bnorm_svpvDistance_2D"};
+    static const double ranges[][2] = {      {0.5,4},  {5 , 6},    {0,15},     {2.9,3.25}, {0, 50},   {0, 2.4}, {0, 3.15},     {0.5,1.5}, {0.75,1.05},          {0.999,1},                {0,0.9}, {0.05,1}, {0,1}, {0.5,5},{0.5,5}, {0,15}};
     int nVars = sizeof(variables)/sizeof(variables[0]);
 
     auto axisLabel = [&](const TString &var)->TString{
@@ -46,19 +46,19 @@ void plot2D_dataMC(TString TREE = "ntKstar", TString systemNAME = "ppRef")
         }
     } else {
         if (TREE == "ntmix") {
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_DATA.root");
-            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntmix_ppRef_MC.root";
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_ppRef_scored_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_ppRef_scored_MC_X3872.root";
         } else if (TREE == "ntphi") {
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntphi_ppRef_DATA_noFID.root");
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntphi_ppRef_DATA.root");
             path_to_MC = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/MC_Bs.root";
         }
         else if (TREE == "ntKp") {
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKp_ppRef_DATA.root");
             path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/MC_Bu.root";
         }
         else if (TREE == "ntKstar") {
-            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root");
-            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_MC.root";
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKstar_ppRef_DATA.root");
+            path_to_MC = "/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKstar_ppRef_MC.root";
         }
     }
 

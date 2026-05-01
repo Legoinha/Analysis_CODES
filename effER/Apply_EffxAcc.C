@@ -10,27 +10,21 @@
 #include <vector>
 #include <iostream>
 
+#include "aux/uti.h"
 #include "../plotER/aux/masses.h"
 
 void Apply_EffxAcc(
 	TString treename = "ntmix",
 	TString SYSTEM = "ppRef",
-	TString VAR = "Bpt",
-    bool forX = true
+	TString VAR = "Bpt"
 ) {
 
     cout << "Applying EffxAcc correction for " << treename.Data() << " in " << SYSTEM.Data() << " for variable " << VAR.Data() << endl;
-    if (treename == "ntmix") {
-        if (forX) cout << "Processing X(3872)" << endl;
-        else      cout << "Processing Psi(2S)" << endl;
-    }
 
-	TString dataFilePath   = Form("./../flatER/flat_%s_%s_DATA.root", treename.Data(), SYSTEM.Data());
-	TString suffix = "";
-	if (treename == "ntmix") suffix = (forX ? "_X3872" : "_Psi2S");
-	TString accEffFilePath = Form("./output/ROOTs/%s_%s2Dmap_ACCxEFF%s.root"    , treename.Data(), SYSTEM.Data() , suffix.Data());
+	TString dataFilePath   = GetDataEffPath(treename, SYSTEM);
+	TString accEffFilePath = Form("./output/ROOTs/%s_%s2Dmap_ACCxEFF.root"       , treename.Data(), SYSTEM.Data());
 	TString yieldsFilePath = Form("./../fitER/ROOTfiles/yields_%s_%s_%s.root"   , treename.Data(), VAR.Data()    , SYSTEM.Data());
-	TString outputFilePath = Form("output/ROOTs/%s_%s_%s_CorrectedYields%s.root", treename.Data(), SYSTEM.Data() , VAR.Data(), suffix.Data());
+	TString outputFilePath = Form("output/ROOTs/%s_%s_%s_CorrectedYields.root"   , treename.Data(), SYSTEM.Data() , VAR.Data());
 	
     gSystem->Exec("mkdir -p output/");
 	gSystem->Exec("mkdir -p output/ROOTs/");
@@ -42,7 +36,9 @@ void Apply_EffxAcc(
 
 	// Load data tree
 	TFile* fData = TFile::Open(dataFilePath, "READ");
-	TTree* tReco = (TTree*)fData->Get(treename);
+	TString dataTreeName = treename;
+	if (treename == "ntmix_psi2s") dataTreeName = "ntmix";
+	TTree* tReco = (TTree*)fData->Get(dataTreeName);
 	float Bpt = 0.f, By = 0.f, Bmass = 0.f;
     int nMult = 0;
 	tReco->SetBranchAddress("Bpt", &Bpt);
@@ -53,7 +49,6 @@ void Apply_EffxAcc(
 	// Load yields for binning and corrected yield 
 	TFile* fYield = TFile::Open(yieldsFilePath,"READ");
 	TH1D* hYield = (TH1D*)fYield->Get("hPt");
-	if (treename == "ntmix" && !forX){hYield = (TH1D*)fYield->Get("hPt_2S");}
 
 	// Determine bins
 	std::vector<double> Yield_varBin;
@@ -67,10 +62,8 @@ void Apply_EffxAcc(
 
 	// Masses for signal region definition
 	double mass_main  = 0.0;
-	if (treename == "ntmix"){ 
-        mass_main  = X3872_MASS;
-        if (!forX) mass_main = PSI2S_MASS; 
-    }
+	if (treename == "ntmix")       mass_main = X3872_MASS;
+	else if (treename == "ntmix_psi2s") mass_main = PSI2S_MASS;
 	else if (treename == "ntphi")   mass_main = Bs_MASS;
 	else if (treename == "ntKp")    mass_main = Bu_MASS;
 	else if (treename == "ntKstar") mass_main = Bd_MASS;
@@ -150,7 +143,7 @@ void Apply_EffxAcc(
 	TFile* fout = new TFile(outputFilePath, "RECREATE");
 	hAvg_Inv_EffxAcc->Write();
 	hYieldCorr->Write();
-	if (hYield) hYield->Write("hYieldRaw" + suffix);
+	if (hYield) hYield->Write("hYieldRaw");
 	fout->Close();
 
 	// Save <1/ea> plot
@@ -158,7 +151,7 @@ void Apply_EffxAcc(
 	cCorr->SetLeftMargin(0.15);
 	hAvg_Inv_EffxAcc->GetYaxis()->SetTitleOffset(1.6);
 	hAvg_Inv_EffxAcc->Draw("E1");
-	cCorr->SaveAs(Form("output/%s_%s_%s_AvgInvEffxAcc%s.pdf", treename.Data(), SYSTEM.Data(), VAR.Data(), suffix.Data()));
+	cCorr->SaveAs(Form("output/%s_%s_%s_AvgInvEffxAcc.pdf", treename.Data(), SYSTEM.Data(), VAR.Data()));
 	delete cCorr;
 
 	// Save corrected yields plot
@@ -166,7 +159,7 @@ void Apply_EffxAcc(
 	cYield->SetLeftMargin(0.15);
 	hYieldCorr->GetYaxis()->SetTitleOffset(1.6);
 	hYieldCorr->Draw("E1");
-	cYield->SaveAs(Form("output/%s_%s_%s_CorrectedYields%s.pdf", treename.Data(), SYSTEM.Data(), VAR.Data(), suffix.Data()));
+	cYield->SaveAs(Form("output/%s_%s_%s_CorrectedYields.pdf", treename.Data(), SYSTEM.Data(), VAR.Data()));
 	delete cYield;
 
 	fAccEff->Close();

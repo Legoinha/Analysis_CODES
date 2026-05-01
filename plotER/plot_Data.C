@@ -5,6 +5,7 @@
 #include <TBox.h>
 #include <TLine.h>
 #include <TLegend.h>
+#include <TLatex.h>
 #include <TChain.h>
 #include <TSystem.h>
 #include <TStyle.h>
@@ -12,7 +13,6 @@
 
 #include "aux/parameters.h"
 #include "aux/masses.h"
-#include "aux/uti.h"
 
 void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin = -1){
     gStyle->SetOptStat(0);
@@ -21,14 +21,17 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin =
     TChain chain(Form("%s", TREE.Data()));
 
     if(systemNAME.Contains("PbPb23")){        //PbPb23 data
-        chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
+        chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb23_scored_DATA.root");
     } else if(systemNAME.Contains("PbPb24")) {//PbPb24 data
-        chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_DATA.root");
-    } else { //ppRef data
-        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root");}
-        else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKp_ppRef_DATA.root");}
+        chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb24_scored_DATA.root");
+    }else if (systemNAME.Contains("PbPb")){
+        chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_PbPb_selected_DATA.root");
+
+    }else { //ppRef data
+        if (TREE == "ntmix"){       chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_ppRef_scored_DATA.root");}
+        else if (TREE == "ntKp") {  chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKp_ppRef_DATA.root");}
         else if (TREE == "ntphi"){  chain.Add("/eos/user/h/hmarques/Analysis_CODES/plotER/Data_Bs.root");}
-        else if (TREE == "ntKstar"){chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/flat_ntKstar_ppRef_DATA.root");}
+        else if (TREE == "ntKstar"){chain.Add("/eos/user/h/hmarques/Analysis_CODES/flatER/Bmeson/flat_ntKstar_ppRef_DATA.root");}
     }
 
     // Create a canvas to draw the histogram
@@ -44,11 +47,21 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin =
 
     TString SELECTIONcuts = "1";
 
+
+    // ppRef:  abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.65 && BQvalue < 0.2 && 1
+    // PbPb23: abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.90 && BQvalue < 0.15 && CentBin > 10 && CentBin < 80 && 1
+    // PbPb24: abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.85 && BQvalue < 0.15 && CentBin > 10 && CentBin < 80 && 1
     if (TREE == "ntmix") {
-        //SELECTIONcuts = "BQvalue < 0.1 "
-        //                "&& xgb_score > 0.45";
-        SELECTIONcuts = "1 "
-                        "&& xgb_score > 0.61 && BQvalue < 0.15";
+        if (systemNAME.Contains("PbPb23")) {
+            SELECTIONcuts = "abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.9 && BQvalue < 0.15 && CentBin >10 && CentBin < 80";
+        } else if (systemNAME.Contains("PbPb24")) {
+            SELECTIONcuts = "abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.85 && BQvalue < 0.15 && CentBin > 10 && CentBin < 80";
+        } else if (systemNAME.Contains("PbPb")) {
+            SELECTIONcuts = "1";
+        } else {
+            //SELECTIONcuts = "abs(By) < 1.6 && Bpt > 10 && xgb_score > 0.65 && BQvalue < 0.2";
+            SELECTIONcuts = "BQvalue < 0.1";
+        }
     }
     else if (TREE != "ntmix"){ SELECTIONcuts = "Bnorm_svpvDistance_2D > 4" ;}
 
@@ -57,9 +70,9 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin =
     //std::cout << "DATA entries (after cuts): " << chain.GetEntries(SELECTIONcuts.Data()) << std::endl;
 
     TString Xlabel;
-    if (TREE == "ntmix")       {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} (GeV)";} 
-    else if (TREE == "ntphi")  {Xlabel = "m_{J/#Psi K^{+} K^{-}} (GeV)";    }
-    else if (TREE == "ntKp")   {Xlabel = "m_{J/#Psi K^{+}} (GeV)";          }
+    if (TREE == "ntmix")      {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} (GeV)";} 
+    else if (TREE == "ntphi") {Xlabel = "m_{J/#Psi K^{+} K^{-}} (GeV)";    }
+    else if (TREE == "ntKp")  {Xlabel = "m_{J/#Psi K^{+}} (GeV)";          }
     else if (TREE == "ntKstar"){Xlabel = "m_{J/#Psi K^{+} #pi^{-}} (GeV)";  }
 
     // Create an histogram for Bmass
@@ -76,7 +89,7 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin =
 
     // Print system and number of entries in top right corner
     int nentries = hist_Bmass->GetEntries();
-    TLatex* sys_entries = new TLatex(0.6, 0.87, Form("%s, N = %d", systemNAME.Data(), nentries));
+    TLatex* sys_entries = new TLatex(0.2, 0.88, Form("%s, N = %d", systemNAME.Data(), nentries));
 	sys_entries->SetNDC();
 	sys_entries->SetTextAlign(13);
 	sys_entries->SetTextFont(42);
@@ -84,7 +97,7 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef", int ithBin =
 	sys_entries->SetLineWidth(2);
 	sys_entries->Draw();
 
-    if (false && TREE == "ntmix") {
+    if (true && TREE == "ntmix") {
         const double yMin = 0.0;
         const double yMax = hist_Bmass->GetMaximum() * 1.02;
 

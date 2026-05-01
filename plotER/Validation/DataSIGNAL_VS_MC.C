@@ -41,12 +41,12 @@ static constexpr int kNBins = 15;
 
 static bool isMixFamily(TString treeName)
 {
-    return (treeName == "ntmix" || treeName == "ntmix_psi2s");
+    return treeName.BeginsWith("ntmix");
 }
 
 static TString dataTreeName(TString treeName)
 {
-    return (treeName == "ntmix_psi2s") ? "ntmix" : treeName;
+    return treeName.BeginsWith("ntmix") ? "ntmix" : treeName;
 }
 
 static TString makeTag(TString expr) {
@@ -121,9 +121,6 @@ static TString resolveModelPath(TString modelPath, TString treeName)
 {
     std::vector<TString> tries;
     tries.push_back(modelPath);
-    tries.push_back(Form("../fitER/ROOTfiles/nominalFitModel_%s_ppRef.root", treeName.Data()));
-    tries.push_back(Form("../../fitER/ROOTfiles/nominalFitModel_%s_ppRef.root", treeName.Data()));
-    tries.push_back(Form("/eos/user/h/hmarques/Analysis_CODES/fitER/ROOTfiles/nominalFitModel_%s_ppRef.root", treeName.Data()));
 
     for (const auto& p : tries) {
         if (p.IsNull() || TString(p).Length() == 0) continue;
@@ -200,8 +197,8 @@ static SigmaInfo extractSigmaFromModel(TString modelPath, TString treeName)
 
 static TString particleLabel(TString treeName)
 {
-    if (treeName == "ntmix") return "#bf{X(3872)}";
-    if (treeName == "ntmix_psi2s") return "#bf{#psi(2S)}";
+    if (treeName == "ntmix" || treeName == "ntmix_X3872") return "#bf{X(3872)}";
+    if (treeName == "ntmix_psi2s" || treeName == "ntmix_PSI2S") return "#bf{#psi(2S)}";
     if (treeName == "ntKp") return "#bf{B^{+}}";
     if (treeName == "ntKstar") return "#bf{B^{0}}";
     if (treeName == "ntphi") return "#bf{B_{s}^{0}}";
@@ -265,7 +262,7 @@ void run_sideband_method(
     fMC->GetObject(treeName, tMC);
 
     // Region definition in sigma units
-    const double signalNSigma = (treeName == "ntmix_psi2s") ? 3. : 2.;
+    const double signalNSigma = (treeName == "ntmix_psi2s" || treeName == "ntmix_PSI2S") ? 3. : 2.;
     const double sidebandInNSigma = 4.;
     const double sidebandOutNSigma = 8.0;
 
@@ -489,10 +486,10 @@ void run_splot_method(
     }
     double massMin = 5.0;
     double massMax = 5.8;
-    if (treeName == "ntmix") {
+    if (treeName == "ntmix" || treeName == "ntmix_X3872") {
         massMin = 3.8;
         massMax = 4.0;
-    } else if (treeName == "ntmix_psi2s") {
+    } else if (treeName == "ntmix_psi2s" || treeName == "ntmix_PSI2S") {
         massMin = 3.6;
         massMax = 3.8;
     }
@@ -842,11 +839,11 @@ void run_compare_methods(
 }
 
 void DataSIGNAL_VS_MC(
-    TString dataPath  = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_DATA_wScore.root",
-    TString mcPath    = "/eos/user/h/hmarques/Analysis_CODES/flatER/X3872/flat_ntmix_ppRef_MC_wScore_X3872.root",
-    TString modelPath = "../fitER/ROOTfiles/nominalFitModel_ntmix_ppRef.root",
-    TString baseCut   = "xgb_score > 0.61 && BQvalue<0.15",
-    TString treeName  = "ntmix")
+    TString dataPath  = "/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_ppRef_scored_DATA.root",
+    TString mcPath    = "/eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/flat_ntmix_ppRef_scored_MC_X3872.root",
+    TString modelPath = "/eos/user/h/hmarques/Analysis_CODES/fitER/ROOTfiles/ppRef/nominalFitModel_ntmix_X3872_ppRef.root",
+    TString baseCut   = "xgb_score > 0.7 && abs(By) < 1.2 && Bpt > 10 && BQvalue < 0.1",
+    TString treeName  = "ntmix_X3872")
 {
     gStyle->SetOptStat(0);
     gStyle->SetOptTitle(0);

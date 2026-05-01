@@ -14,7 +14,14 @@ PVSNP="${5:-}"
 
 FILELIST_SUBDIR="filelists/${KIND}"
 CASETAG="${PARTICLE}${PVSNP}"
-FINAL_OUTPUT="flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}.root"
+if [[ "${TREE}" == "ntmix" ]]; then
+  OUTPUT_DIR="${SCRIPT_DIR}/X3872"
+else
+  OUTPUT_DIR="${SCRIPT_DIR}/Bmeson"
+fi
+mkdir -p "${OUTPUT_DIR}"
+
+FINAL_OUTPUT="${OUTPUT_DIR}/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}.root"
 TMP_OUTPUT="$(mktemp "/tmp/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}.XXXXXX.root")"
 INDEXED_OUTPUTS=()
 MATCHED_LISTS=()
@@ -52,14 +59,21 @@ done < <(find "${FILELIST_SUBDIR}" -type f -name '*.txt' | sort)
 
 cd "${SCRIPT_DIR}"
 
+if [[ "${#MATCHED_LISTS[@]}" -eq 0 ]]; then
+  echo "No matching filelists found in ${FILELIST_SUBDIR} for SYSTEM=${SYSTEM} KIND=${KIND} TREE=${TREE} PARTICLE=${PARTICLE} PVSNP=${PVSNP}" >&2
+  exit 1
+fi
+
 # Run the flattener once per matched list and tag each chunk with _0, _1, _2, ...
 for idx in "${!MATCHED_LISTS[@]}"; do
   FILELIST="${MATCHED_LISTS[$idx]}"
   NUN="_${idx}"
   OUTPUT_CHUNK="flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}${NUN}.root"
+  OUTPUT_CHUNK_PATH="${OUTPUT_DIR}/${OUTPUT_CHUNK}"
 
   root -l -b -q "${MACRO_NAME}(\"${FILELIST}\",\"${NUN}\",\"${TREE}\",\"${SYSTEM}\",\"${KIND}\",\"${PARTICLE}\",\"${PVSNP}\")"
-  INDEXED_OUTPUTS+=("${OUTPUT_CHUNK}")
+  mv -f "${OUTPUT_CHUNK}" "${OUTPUT_CHUNK_PATH}"
+  INDEXED_OUTPUTS+=("${OUTPUT_CHUNK_PATH}")
 done
 
 # Merge all chunk outputs into one final file, then remove the indexed temporary files.
