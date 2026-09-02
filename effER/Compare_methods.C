@@ -8,7 +8,7 @@
 #include "aux/uti.h"
 
 // root -b -q 'Compare_methods.C("ntmix_X3872","ppRef","Bpt")'
-// root -b -q 'Compare_methods.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks")'
+// root -b -q 'Compare_methods.C("ntmix_PSI2S","ppRef","nChargedTracks")'
 
 void Compare_methods(
     TString treename = "ntmix_X3872",

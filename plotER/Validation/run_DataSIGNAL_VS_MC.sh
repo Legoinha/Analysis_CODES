@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   bash run_DataSIGNAL_VS_MC.sh [tree] [system] [custom_cut] [mode] [reweight_variable] [whichWeight]
+#   bash run_DataSIGNAL_VS_MC.sh [tree] [system] [custom_cut] [mode] [reweight_variable] [weight_particle]
 #
 # mode:
 #   nominal   Run the nominal comparison and write sPlot + ML-discrepancy weights.
@@ -14,8 +14,8 @@ set -euo pipefail
 
 #   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight
 #   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight Bchi2Prob
-#   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight Btrk1PErr,Bchi2Prob
-#   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight Prediction usePsi2s
+#   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight Btrk1PtErr,Bchi2Prob
+#   bash run_DataSIGNAL_VS_MC.sh ntmix_X3872 ppRef '' reweight Prediction PSI2S
 
 
 #   bash run_DataSIGNAL_VS_MC.sh ntphi ppRef "Bnorm_svpvDistance_2D > 4"
@@ -24,8 +24,8 @@ TREE="${1:-ntphi}"
 SYSTEM="${2:-ppRef}"
 CUSTOM_CUT="${3:-}"
 MODE="${4:-nominal}"
-REWEIGHT_VARIABLE="${5:-Prediction}"
-WHICH_WEIGHT="${6:-self}"
+REWEIGHT_VARIABLE="${5:-Bpt}"
+WEIGHT_PARTICLE="${6:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -44,59 +44,41 @@ cleanup_aclic() {
 }
 trap cleanup_aclic EXIT
 
-particle_tag() {
-  case "$1" in
-    ntmix|ntmix_X3872) echo "X3872" ;;
-    ntmix_psi2s|ntmix_PSI2S) echo "PSI2S" ;;
-    ntKp) echo "Bp" ;;
-    ntKstar) echo "B0" ;;
-    ntphi) echo "Bs" ;;
-    *) echo "$1" ;;
-  esac
-}
-
-weight_tree_tag() {
-  case "$1" in
-    ntmix|ntmix_*) echo "ntmix" ;;
-    *) echo "$1" ;;
-  esac
-}
-
-weight_particle_tag() {
-  local choice="${1,,}"
-  choice="${choice//_/}"
-  choice="${choice//-/}"
-  case "$choice" in
-    ""|self|own|useown|useself) echo "$PARTICLE" ;;
-    usex|x|x3872|usex3872) echo "X3872" ;;
-    usepsi2s|psi2s|usepsi|psi) echo "PSI2S" ;;
-    *)
-      echo "[ERROR] Unknown whichWeight \"$1\". Use self, useX, or usePsi2s." >&2
-      return 1
-      ;;
-  esac
-}
-
-
 case "$TREE" in
   ntmix|ntmix_X3872)
     TREE="ntmix_X3872"
-    DATA="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/DATA_with_score.root"
-    MC="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/MC_with_score.root"
-    CUTs="BQvalue < 0.15 && Prediction > 0.58 && Bpt > 7.5 && Bpt < 50"
+    DATA_TREE="ntmix"
+    PARTICLE="X3872"
+    WEIGHT_TREE="ntmix"
+    MASS_AXIS_TITLE="m_{J/#psi #pi^{-} #pi^{+}} [GeV/c^{2}]"
+    DATA="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root"
+    MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root"
+    CUTs="Btrk1dR < 0.5 && Btrk2dR < 0.5 && BQvalue < 0.15"
     ;;
   ntmix_psi2s|ntmix_PSI2S)
     TREE="ntmix_PSI2S"
-    DATA="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/DATA_with_score.root"
-    MC="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/MC_psi2s_with_score.root"
-    CUTs="BQvalue < 0.15 && Prediction > 0.58 && Bpt > 7.5 && Bpt < 50"
+    DATA_TREE="ntmix"
+    PARTICLE="PSI2S"
+    WEIGHT_TREE="ntmix"
+    MASS_AXIS_TITLE="m_{J/#psi #pi^{-} #pi^{+}} [GeV/c^{2}]"
+    DATA="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root"
+    MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root"
+    CUTs="Btrk1dR < 0.5 && Btrk2dR < 0.5 && BQvalue < 0.15"
     ;;
   ntphi)
+    DATA_TREE="ntphi"
+    PARTICLE="Bs"
+    WEIGHT_TREE="ntphi"
+    MASS_AXIS_TITLE="m_{J/#psi K^{+} K^{-}} [GeV/c^{2}]"
     DATA="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/Data_2024ppRef_Bs.root"
     MC="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/MC_2024ppRef_Bs.root"
     CUTs="Bnorm_svpvDistance_2D > 4"
     ;;
   ntKp)
+    DATA_TREE="ntKp"
+    PARTICLE="Bp"
+    WEIGHT_TREE="ntKp"
+    MASS_AXIS_TITLE="m_{J/#psi K^{+}} [GeV/c^{2}]"
     DATA="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/Data_2024ppRef_Bu.root"
     MC="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/MC_2024ppRef_Bu.root"
     #DATA="./../../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_DATA.root"
@@ -104,25 +86,19 @@ case "$TREE" in
     CUTs="Bnorm_svpvDistance_2D > 4"
     ;;
   ntKstar)
+    DATA_TREE="ntKstar"
+    PARTICLE="B0"
+    WEIGHT_TREE="ntKstar"
+    MASS_AXIS_TITLE="m_{J/#psi #pi^{+} K^{-}} [GeV/c^{2}]"
     DATA="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/Data_2024ppRef_B0.root"
     MC="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/MC_2024ppRef_B0.root"
     CUTs="Bnorm_svpvDistance_2D > 4"
     ;;
-  *)
-    echo "Unknown tree: $TREE"
-    echo "Use one of: ntmix_X3872, ntmix_PSI2S, ntphi, ntKp, ntKstar"
-    exit 1
-    ;;
 esac
 
 CUT="${CUSTOM_CUT:-$CUTs}"
-PARTICLE="$(particle_tag "$TREE")"
-WEIGHT_PARTICLE="$(weight_particle_tag "$WHICH_WEIGHT")"
-WEIGHT_TREE="$(weight_tree_tag "$TREE")"
+WEIGHT_PARTICLE="${WEIGHT_PARTICLE:-$PARTICLE}"
 MODEL="${BASE}/fitER/ROOTfiles/${SYSTEM}/nominalFitModel_${TREE}_${SYSTEM}.root"
-if [[ ! -f "$MODEL" && -f "${BASE}/fitER/ROOTfiles/nominalFitModel_${TREE}_${SYSTEM}.root" ]]; then
-  MODEL="${BASE}/fitER/ROOTfiles/nominalFitModel_${TREE}_${SYSTEM}.root"
-fi
 
 MODE_LC="${MODE,,}"
 case "$MODE_LC" in
@@ -132,21 +108,9 @@ case "$MODE_LC" in
   reweight|reweighted|rw|1|true|yes)
     REWEIGHT_MC=1
     ;;
-  *)
-    echo "[ERROR] Unknown mode '$MODE'. Use 'nominal' or 'reweight'."
-    exit 1
-    ;;
 esac
 
-WEIGHT_FILE=""
-if [[ "$REWEIGHT_MC" == "1" ]]; then
-  WEIGHT_FILE="WEIGHTS/${WEIGHT_TREE}_${SYSTEM}_${WEIGHT_PARTICLE}_weight.root"
-  if [[ ! -f "$WEIGHT_FILE" ]]; then
-    echo "[ERROR] Reweight file not found: $WEIGHT_FILE"
-    echo "        Run the nominal validation first to produce it."
-    exit 1
-  fi
-fi
+WEIGHT_FILE="WEIGHTS/${WEIGHT_TREE}_${SYSTEM}_${WEIGHT_PARTICLE}_weight.root"
 
 echo "Running DataSIGNAL_VS_MC.C with:"
 echo "  TREE        = $TREE"
@@ -157,7 +121,7 @@ echo "  MC          = $MC"
 echo "  MODEL       = $MODEL"
 echo "  MODE        = $MODE_LC"
 echo "  REW_VAR     = $REWEIGHT_VARIABLE"
-echo "  WHICH_WEIGHT = $WHICH_WEIGHT -> $WEIGHT_PARTICLE"
+echo "  WEIGHT_PARTICLE = $WEIGHT_PARTICLE"
 echo "  WEIGHT_FILE = $WEIGHT_FILE"
 
-root -l -b -q "DataSIGNAL_VS_MC.C(\"${DATA}\",\"${MC}\",\"${MODEL}\",\"${CUT}\",\"${TREE}\",\"${SYSTEM}\",${REWEIGHT_MC},\"${WEIGHT_FILE}\",\"${REWEIGHT_VARIABLE}\",\"${WHICH_WEIGHT}\")"
+root -l -b -q "DataSIGNAL_VS_MC.C(\"${DATA}\",\"${MC}\",\"${MODEL}\",\"${CUT}\",\"${TREE}\",\"${DATA_TREE}\",\"${MASS_AXIS_TITLE}\",${REWEIGHT_MC},\"${WEIGHT_FILE}\",\"${REWEIGHT_VARIABLE}\",\"${WEIGHT_PARTICLE}\")"

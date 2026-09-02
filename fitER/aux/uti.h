@@ -369,7 +369,7 @@ inline TString FitVarLabel(TString var)
 {
 	if (var == "Bpt") return "p_{T} [GeV/c]";
 	if (var == "By") return "|y|";
-	if (var == "nSelectedChargedTracks") return "n_{ch}";
+	if (var == "nChargedTracks") return "n_{ch}";
 	if (var == "CentBin") return "Centrality (%)";
 	return var;
 }
@@ -515,7 +515,7 @@ inline std::string GetSystematicColumnLabel(const TString& var, double lowEdge, 
 	std::ostringstream clabel;
 	if (var == "Bpt") { clabel << lowEdge << "$<p_T<$" << highEdge   ;} 
   else if (var == "By") { clabel << lowEdge << "$<|y|<$" << highEdge ;} 
-  else if (var == "nSelectedChargedTracks") { clabel << lowEdge << "$<nTrks<$" << highEdge ;} 
+  else if (var == "nChargedTracks") { clabel << lowEdge << "$<nTrks<$" << highEdge ;}
   else if (var == "CentBin") { clabel << lowEdge << "$<Cent<$" << highEdge ;} 
   else { clabel << lowEdge << "<" << var.Data() << "<" << highEdge  ;}
 	return clabel.str();

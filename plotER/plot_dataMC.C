@@ -47,10 +47,81 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
     //VARIABLES
     //VARIABLES
     //VARIABLES
-    const char * variables[] = {"Bnorm_trk1Dz", "Bnorm_trk2Dz", "Bmass", "PVnchi2", "Btktkpt", "BLxy",  "BsvpvDistance_2D",  "abs(By)",  "BtktkvProb",    "Bpt",     "BQvalue",   "Bcos_dtheta", "BtrkPtimb", "Bchi2Prob", "Btrk2dR", "Btrk1dR", "Btrk1Pt", "Btrk2Pt", "Bnorm_svpvDistance_2D", "Prediction",
-                                "PVx", "PVy", "PVz", "BvtxX", "BvtxY", "BsvpvDisErr_2D", "Btrk1Eta", "Btrk2Eta", "Btrk1Phi", "Btrk2Phi", "Btrk1PtErr", "Btrk2PtErr", "BujvProb", "Bmu1y", "Bmu2y", "Bmu1pt", "Bmu2pt"};
-    const double ranges[][2] = {{-2000.0,2000.0}, {-2000.0,2000.0}, {3.6,4},     {0,1},   {0,10},    {-0.1,0.1},           {0,0.25},    {0,2.4},         {0,1},   {0,50},     {0.0,0.6},         {0.95,1},    {0,1},     {0.0,1},   {0,1.5},   {0,1.5},    {0.5,4.5},    {0.5,4.5},            {0,20},   {0,1},
-                                {-0.1,0.1}, {-0.1,0.1}, {-30.0,30.0}, {-0.05,0.05}, {-0.05,0.05}, {0.0,0.05}, {-2.4,2.4}, {-2.4,2.4}, {-3.2,3.2}, {-3.2,3.2}, {0.0,.1}, {0.0,0.1}, {0.0,1.0}, {-2.4,2.4}, {-2.4,2.4}, {0.0,17.5}, {0.0,17.5}};    
+    struct PlotVariable {
+        const char* expression;
+        double xmin;
+        double xmax;
+    };
+    const PlotVariable variables[] = {
+        {"PVx",                       -0.1,  0.1},
+        {"PVy",                       -0.1,  0.1},
+        {"PVz",                      -30.0, 30.0},
+        {"PVnchi2",                    0.0,  1.0},
+        {"nChargedTracks",             0.0, 200.0},
+        {"nChargedTracks_LOOSE",       0.0, 200.0},
+        {"nChargedTracks_TIGHT",       0.0, 200.0},
+        {"CentBin",                    0.0, 200.0},
+        {"Bmass",                      3.6,  4.0},
+        {"Bpt",                        0.0, 50.0},
+        {"abs(By)",                    0.0,  2.4},
+        {"Bchi2Prob",                  0.0,  1.0},
+        {"Btrk1dR",                    0.0,  1.5},
+        {"Btrk2dR",                    0.0,  1.5},
+        {"BtrkPtimb",                  0.0,  1.0},
+        {"Btktkpt",                    0.0, 10.0},
+        {"Bujmass",                    2.9,  3.3},
+        {"BujvProb",                   0.0,  1.0},
+        {"Bnorm_svpvDistance_2D",      0.0, 20.0},
+        {"BsvpvDistance_2D",           0.0,  0.25},
+        {"BsvpvDisErr_2D",             0.0,  0.05},
+        {"BQvalue",                    0.0,  0.6},
+        {"Bnorm_trk1Dxy",             -5.0,  5.0},
+        {"Bnorm_trk2Dxy",             -5.0,  5.0},
+        {"Balpha",                     0.0,  3.2},
+        {"Bdtheta",                   -3.2,  3.2},
+        {"Bcos_dtheta",               -1.0,  1.0},
+        {"Btktkmass",                  0.0,  2.0},
+        {"Btrk1Pt",                    0.0, 10.0},
+        {"Btrk2Pt",                    0.0, 10.0},
+        {"Btrk1Eta",                  -2.4,  2.4},
+        {"Btrk2Eta",                  -2.4,  2.4},
+        {"Btrk1Phi",                  -3.2,  3.2},
+        {"Btrk2Phi",                  -3.2,  3.2},
+        {"Btrk1PtErr",                 0.0,  0.1},
+        {"Btrk2PtErr",                 0.0,  0.1},
+        {"BtktkvProb",                 0.0,  1.0},
+        {"BLxy",                      -0.1,  0.1},
+        {"BvtxX",                     -0.05, 0.05},
+        {"BvtxY",                     -0.05, 0.05},
+        {"Bmu1pt",                     0.0, 25.0},
+        {"Bmu2pt",                     0.0, 25.0},
+        {"Bmu1eta",                   -2.4,  2.4},
+        {"Bmu2eta",                   -2.4,  2.4},
+        {"Bmu1phi",                   -3.2,  3.2},
+        {"Bmu2phi",                   -3.2,  3.2},
+        {"Bujpt",                      0.0, 50.0},
+        {"Bujeta",                    -2.4,  2.4},
+        {"Bujphi",                    -3.2,  3.2},
+        {"Bujlxy",                    -0.1,  0.1},
+        {"BdiTrackFitValid",          -0.5,  1.5},
+        {"Btrk1Dz1",                  -0.5,  0.5},
+        {"Btrk2Dz1",                  -0.5,  0.5},
+        {"Btrk1DzError1",              0.0,  0.1},
+        {"Btrk2DzError1",              0.0,  0.1},
+        {"Btrk1Dxy1",                 -0.2,  0.2},
+        {"Btrk2Dxy1",                 -0.2,  0.2},
+        {"Btrk1DxyError1",             0.0,  0.1},
+        {"Btrk2DxyError1",             0.0,  0.1},
+        {"Btktketa",                  -2.4,  2.4},
+        {"Btktkphi",                  -3.2,  3.2},
+        {"Btktky",                    -2.4,  2.4},
+        {"Bdoubletpt",                 0.0, 50.0},
+        {"Bdoubleteta",               -2.4,  2.4},
+        {"Bdoubletphi",               -3.2,  3.2},
+        {"Bdoublety",                 -2.4,  2.4},
+        {"Bnorm_trk1Dz",              -5.0,  5.0},
+        {"Bnorm_trk2Dz",              -5.0,  5.0}
+    };
     //const char * variables[] = {"BQvalue"};
     //const double ranges[][2] = {{0,0.6}};
     //const char * variables[] = {"Btrk1dR","Btrk2dR",};
@@ -87,12 +158,12 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
             path_to_MC_spec = Form("/eos/user/k/kprince/X3872_PbPb/MC_PSI2S_24b_PbPb_AANN.root");
             path_to_data    = Form("/eos/user/k/kprince/X3872_PbPb/DATA_24b_PbPb_AANN.root");
         } else {
-            path_to_data    = Form("/eos/user/k/kprince/X3872_pp_new/DATA_pp_VAANN.root");
-            path_to_MC_spec = Form("/eos/user/k/kprince/X3872_pp_new/MC_PSI2S_pp_VAANN.root");
-            path_to_MC      = Form("/eos/user/k/kprince/X3872_pp_new/MC_X3872_pp_VAANN.root");
-            //path_to_MC = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root");
-            //path_to_MC_spec = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root");
-            //path_to_data = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root");
+            //path_to_data    = Form("/eos/user/k/kprince/X3872_pp_new/DATA_pp_VAANN.root");
+            //path_to_MC_spec = Form("/eos/user/k/kprince/X3872_pp_new/MC_PSI2S_pp_VAANN.root");
+            //path_to_MC      = Form("/eos/user/k/kprince/X3872_pp_new/MC_X3872_pp_VAANN.root");
+            path_to_MC = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root");
+            path_to_MC_spec = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root");
+            path_to_data = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root");
         }
         mcTreeNameSpec = "ntmix_PSI2S";
     } else {
@@ -114,7 +185,7 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
 
     int nVars = sizeof(variables)/sizeof(variables[0]);
     for (int i = 0; i < nVars; ++i){
-        TString var = variables[i];
+        TString var = variables[i].expression;
         if (!hasVariableForDraw(&chain, var) || !hasVariableForDraw(tree_MC, var) ||
             (tree_MC_spec && !hasVariableForDraw(tree_MC_spec, var))) {
             std::cout << "[plot_dataMC] Skipping missing variable: " << var << std::endl;
@@ -130,8 +201,8 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         gStyle->SetOptStat(0);
 
         int nbinsVARhistos = 100;
-        double hist_Xhigh      = ranges[i][1];
-        double hist_Xlow       = ranges[i][0];
+        double hist_Xhigh      = variables[i].xmax;
+        double hist_Xlow       = variables[i].xmin;
         if (var == "Bmass") {
             if (TREE == "ntmix_X3872") {hist_Xlow = 3.6; hist_Xhigh = 4.0;}
             else {hist_Xlow = 5.05; hist_Xhigh = 5.8;}
@@ -158,7 +229,7 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         else {sideband = "(Bmass > 5.55)";}
 
         TString ANYsel = "1"; // Prediction > 0.59
-        TString ANA_region = "Bpt > 7.5"; // Bpt > 10 && abs(By) < 1.6
+        TString ANA_region = "Bpt > 7.5 && Bpt < 50"; // Bpt > 10 && abs(By) < 1.6
         tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), Form(" %s && %s", ANYsel.Data(), ANA_region.Data()));
         chain.Draw(Form("%s >> hist_BKG", var.Data()), Form(" %s && %s && %s", sideband.Data(), ANYsel.Data(), ANA_region.Data()));
 

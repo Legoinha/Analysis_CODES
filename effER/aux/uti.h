@@ -159,7 +159,7 @@ inline bool InSignalMassRange(TString treename, double mass)
     if (treename == "ntphi") center = Bs_MASS;
     if (treename == "ntKp") center = Bu_MASS;
     if (treename == "ntKstar") center = Bd_MASS;
-    const double halfWidth = 0.05;
+    const double halfWidth = 0.015;
     return std::abs(mass - center) <= halfWidth;
 }
 
@@ -290,7 +290,7 @@ inline EffResult BuildResult(const EffCase& method, const std::vector<double>& b
     TString axisTitle = var;
     if (var == "Bpt") axisTitle = "p_{T} [GeV]";
     else if (var == "By") axisTitle = "|y|";
-    else if (var == "nMult" || var == "nSelectedChargedTracks") axisTitle = "N_{trk}";
+    else if (var == "nMult" || var == "nChargedTracks") axisTitle = "N_{trk}";
 
     TH1D* hAvg = new TH1D(Form("hAvg_Inv_EffxAcc_%s", method.suffix.Data()),
                           Form(";%s;<#frac{1}{Acc#timesEff}>", axisTitle.Data()), nBins, bins.data());
@@ -327,7 +327,7 @@ inline TString EffPlotAxisTitle(TString var)
 {
     if (var == "Bpt") return "p_{T} [GeV]";
     if (var == "By") return "|y|";
-    if (var == "nMult" || var == "nSelectedChargedTracks") return "N_{trk}";
+    if (var == "nMult" || var == "nChargedTracks") return "N_{trk}";
     return var;
 }
 

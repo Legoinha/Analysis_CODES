@@ -7,7 +7,7 @@ static TString RatioAxisTitle(TString var)
 {
     if (var == "Bpt") return "p_{T} [GeV]";
     if (var == "By") return "|y|";
-    if (var == "nMult" || var == "nSelectedChargedTracks") return "N_{trk}";
+    if (var == "nMult" || var == "nChargedTracks") return "N_{trk}";
     return var;
 }
 

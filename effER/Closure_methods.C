@@ -14,13 +14,13 @@
 // and the only output is the three-method correction-factor comparison PDF.
 //
 // root -l -b -q 'Closure_methods.C("ntmix_X3872","ppRef","Bpt")'
-// root -l -b -q 'Closure_methods.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks")'
+// root -l -b -q 'Closure_methods.C("ntmix_PSI2S","ppRef","nChargedTracks")'
 
 static std::vector<double> GetMethodClosureBins(TString treename, TString var)
 {
     if (var == "Bpt" && (treename == "ntmix_X3872" || treename == "ntmix_PSI2S")) return ptbinsvec_X;
     if (var == "By") return ybinsvec;
-    if (var == "nMult" || var == "nSelectedChargedTracks") return nmbinsvec;
+    if (var == "nMult" || var == "nChargedTracks") return nmbinsvec;
     if (var == "Cent" || var == "CentBin") return centbinsvec;
     throw std::runtime_error(Form("[Closure_methods] No analysis binning configured for %s", var.Data()));
 }

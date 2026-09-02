@@ -38,7 +38,7 @@ static EffResult Run2DMethod(const EffCase& method, TTree* tree, TH2D* h2D, TH1D
     const TString selection = "(" + GetEffSelectionCut(treename, system) + ")";
     TString varExpr = var;
     if (var == "By") varExpr = "abs(By)";
-    else if (var == "nMult") varExpr = "nSelectedChargedTracks";
+    else if (var == "nMult") varExpr = "nChargedTracks";
 
     TTreeFormula cutFormula("effDataCut2D", selection.Data(), tree);
     TTreeFormula massFormula("effBmass2D", "Bmass", tree);
@@ -91,7 +91,7 @@ static EffResult Run1DMethod(const EffCase& method, TTree* tree, TH2D* h2D, TH1D
     const TString selection = "(" + GetEffSelectionCut(treename, system) + ")";
     TString varExpr = var;
     if (var == "By") varExpr = "abs(By)";
-    else if (var == "nMult") varExpr = "nSelectedChargedTracks";
+    else if (var == "nMult") varExpr = "nChargedTracks";
 
     TTreeFormula cutFormula("effDataCut1D", selection.Data(), tree);
     TTreeFormula massFormula("effBmass1D", "Bmass", tree);
@@ -154,12 +154,12 @@ static EffResult RunSPlotMethod(const EffCase& method, TTree* tree, TH2D* h2D, T
 
     TString varExpr = var;
     if (var == "By") varExpr = "abs(By)";
-    else if (var == "nMult") varExpr = "nSelectedChargedTracks";
+    else if (var == "nMult") varExpr = "nChargedTracks";
 
     TString axisTitle = var;
     if (var == "Bpt") axisTitle = "p_{T}";
     else if (var == "By") axisTitle = "|y|";
-    else if (var == "nMult" || var == "nSelectedChargedTracks") axisTitle = "N_{trk}";
+    else if (var == "nMult" || var == "nChargedTracks") axisTitle = "N_{trk}";
 
     const TString baseSelection = "(" + GetEffSelectionCut(treename, system) + ")";
     const TString nominalModelPath = GetNominalModelPath(treename, system);
@@ -186,7 +186,7 @@ static EffResult RunSPlotMethod(const EffCase& method, TTree* tree, TH2D* h2D, T
         AddObsIfBranch(tree, obs, extraObs, "By", -10.0, 10.0);
         AddObsIfBranch(tree, obs, extraObs, "Prediction", -10.0, 10.0);
         AddObsIfBranch(tree, obs, extraObs, "BQvalue", -10.0, 10.0);
-        AddObsIfBranch(tree, obs, extraObs, "nSelectedChargedTracks", -1.0, 1.0e7);
+        AddObsIfBranch(tree, obs, extraObs, "nChargedTracks", -1.0, 1.0e7);
         AddObsIfBranch(tree, obs, extraObs, "Bnorm_svpvDistance_2D", -1.0e6, 1.0e6);
 
         TString dataCut = Form("(%s) && (Bmass>%f && Bmass<%f)", fitSelection.Data(), massMin, massMax);
@@ -252,7 +252,7 @@ static EffResult RunSPlotMethod(const EffCase& method, TTree* tree, TH2D* h2D, T
             const double absY = std::abs(row->getRealValue("By"));
             double varVal = bpt;
             if (var == "By") varVal = absY;
-            else if (var == "nMult" || var == "nSelectedChargedTracks") varVal = row->getRealValue("nSelectedChargedTracks");
+            else if (var == "nMult" || var == "nChargedTracks") varVal = row->getRealValue("nChargedTracks");
 
             const int checkBin = hYield->GetXaxis()->FindFixBin(varVal) - 1;
             if (checkBin != ibin) continue;
@@ -271,7 +271,7 @@ static EffResult RunSPlotMethod(const EffCase& method, TTree* tree, TH2D* h2D, T
 
 
 
-// root -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks","splot","usePw")'
+// root -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nChargedTracks","splot","usePw")'
 // root -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","Bpt","all","all")'
 
 void Apply_EffxAcc(

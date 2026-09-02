@@ -49,7 +49,7 @@ root -b -q "roofitB.C++(\"ntmix_X3872\",\
                       0, \
                       \"$Data_X\", \
                       \"$MC_X\", \
-                      \"nSelectedChargedTracks\", \
+                      \"nChargedTracks\", \
                       \"$CUTs\", \
                       \"$syst\")"
 fi

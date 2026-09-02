@@ -15,7 +15,6 @@ root -l -b -q 'accXeff_2D.C("ntmix_PSI2S","ppRef","useXw")'
 ```
 
 Map meaning:
-
 - `usePw`: nominal map, using the Psi2S Prediction weight.
 - `useXw`: X(3872) Prediction-weight map variation.
 - `raw`: no-reweight map variation.
@@ -42,14 +41,14 @@ For method variations, keep the map fixed to `usePw`. This varies only the corre
 
 ```bash
 root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","Bpt","all","usePw")'
-root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","nSelectedChargedTracks","all","usePw")'
+root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","nChargedTracks","all","usePw")'
 root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","Bpt","all","usePw")'
-root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks","all","usePw")'
+root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nChargedTracks","all","usePw")'
 
 root -l -b -q 'Compare_methods.C("ntmix_X3872","ppRef","Bpt")'
-root -l -b -q 'Compare_methods.C("ntmix_X3872","ppRef","nSelectedChargedTracks")'
+root -l -b -q 'Compare_methods.C("ntmix_X3872","ppRef","nChargedTracks")'
 root -l -b -q 'Compare_methods.C("ntmix_PSI2S","ppRef","Bpt")'
-root -l -b -q 'Compare_methods.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks")'
+root -l -b -q 'Compare_methods.C("ntmix_PSI2S","ppRef","nChargedTracks")'
 ```
 
 ## 3. Map Variations ### X(3872) ### Psi2S
@@ -57,14 +56,14 @@ For map variations, keep the method fixed to `splot`. This varies only the map: 
 
 ```bash
 root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","Bpt","splot","all")'
-root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","nSelectedChargedTracks","splot","all")'
+root -l -b -q 'Apply_EffxAcc.C("ntmix_X3872","ppRef","nChargedTracks","splot","all")'
 root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","Bpt","splot","all")'
-root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks","splot","all")'
+root -l -b -q 'Apply_EffxAcc.C("ntmix_PSI2S","ppRef","nChargedTracks","splot","all")'
 
 root -l -b -q 'Compare_MapWeights.C("ntmix_X3872","ppRef","Bpt")'
-root -l -b -q 'Compare_MapWeights.C("ntmix_X3872","ppRef","nSelectedChargedTracks")'
+root -l -b -q 'Compare_MapWeights.C("ntmix_X3872","ppRef","nChargedTracks")'
 root -l -b -q 'Compare_MapWeights.C("ntmix_PSI2S","ppRef","Bpt")'
-root -l -b -q 'Compare_MapWeights.C("ntmix_PSI2S","ppRef","nSelectedChargedTracks")'
+root -l -b -q 'Compare_MapWeights.C("ntmix_PSI2S","ppRef","nChargedTracks")'
 ```
 
 
@@ -72,6 +71,15 @@ root -l -b -q 'Compare_MapWeights.C("ntmix_PSI2S","ppRef","nSelectedChargedTrack
 
 
 
+## 4. Method Closure Test ### X(3872) ### Psi2S
+For the method closure test, use reconstructed signal MC with the nominal `usePw` map fixed. The `1D`, `2D`, and `splot` correction factors are compared directly, with `splot` taken as the nominal method. Each command produces only the final comparison plot tagged with `_CLOSURE_`.
+
+```bash
+root -l -b -q 'Closure_methods.C("ntmix_X3872","ppRef","Bpt")'
+root -l -b -q 'Closure_methods.C("ntmix_PSI2S","ppRef","Bpt")'
+```
+
+The closure test reuses the existing ACCxEFF maps. Rebuild the maps only when the map construction itself changes.
 
 
 

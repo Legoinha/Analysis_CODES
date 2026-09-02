@@ -67,20 +67,20 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	mass->setRange("all", minhisto, maxhisto);
 	RooRealVar* pt    = new RooRealVar("Bpt","Bpt",0,300);
 	RooRealVar* y     = new RooRealVar("By","By",-2.4, 2.4);
-	RooRealVar* nSelectedChargedTracks = new RooRealVar("nSelectedChargedTracks","nSelectedChargedTracks",0,2000000000);
+	RooRealVar* nChargedTracks = new RooRealVar("nChargedTracks","nChargedTracks",0,2000000000);
 	RooRealVar* CentBin = new RooRealVar("CentBin","CentBin",0,100);
 
 	RooWorkspace* ws = new RooWorkspace("ws");
 	ws->import(*mass);
 	ws->import(*y);
 	ws->import(*pt);
-	ws->import(*nSelectedChargedTracks);
+	ws->import(*nChargedTracks);
 	ws->import(*CentBin);
 
 	//DATA and MC SAMPLES
 	TString dataTree = TREE;
 	if (TREE == "ntmix_PSI2S" || TREE == "ntmix_X3872") dataTree = "ntmix";
-	vector<TString>   ANA_vars = {"Bpt", "By", "CentBin", "nSelectedChargedTracks"};
+	vector<TString>   ANA_vars = {"Bpt", "By", "CentBin", "nChargedTracks"};
 	read_samples(*ws, ANA_vars, INPUTDATA.Data(), dataTree.Data(), "data", SYSTEM.Data(), SELcuts);
 	read_samples(*ws, ANA_vars, INPUTMC.Data()  , TREE.Data(), "mc", SYSTEM.Data(), SELcuts);
 	RooDataSet* data = (RooDataSet*) ws->data("data");
@@ -146,7 +146,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			}
 			var_mean_av[i] = sumAbs / ith_DATA_bin->numEntries();
 		}
-		else if(VAR == "nSelectedChargedTracks"){var_mean_av[i] = ith_DATA_bin->mean(*nSelectedChargedTracks);}
+		else if(VAR == "nChargedTracks"){var_mean_av[i] = ith_DATA_bin->mean(*nChargedTracks);}
 		
 		// for the bin range in the histograms
 		hori_av_low[i]  = var_mean_av[i]-_varBINS[i];
@@ -439,7 +439,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_back->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			if (TREE != "ntmix"){ m_back->GetXaxis()->SetLimits(0,65); }
 		}
-		else if(VAR == "nSelectedChargedTracks"){
+		else if(VAR == "nChargedTracks"){
 			m_back->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			m_back->GetXaxis()->SetLimits(0,110);
 		}
@@ -485,7 +485,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_sig->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			m_sig->GetXaxis()->SetLimits(0,80);
 		}
-		else if(VAR == "nSelectedChargedTracks"){
+		else if(VAR == "nChargedTracks"){
 			m_sig->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			m_sig->GetXaxis()->SetLimits(0,110);
 		}
@@ -504,7 +504,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_back_sig->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			if (TREE != "ntmix"){ m_back_sig->GetXaxis()->SetLimits(0,65); }
 		}
-		else if(VAR == "nSelectedChargedTracks"){
+		else if(VAR == "nChargedTracks"){
 			m_back_sig->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			m_back_sig->GetXaxis()->SetLimits(0,110);
 		}
@@ -561,7 +561,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_gen->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			m_gen->GetXaxis()->SetLimits(0,80);
 		}
-		else if(VAR == "nSelectedChargedTracks"){
+		else if(VAR == "nChargedTracks"){
 			m_gen->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			m_gen->GetXaxis()->SetLimits(0,110);
 		}
@@ -615,7 +615,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			mg->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			mg->GetYaxis()->SetTitle("dY_{S}/dp_{T}");
 			mg->GetXaxis()->SetLimits(0 ,80);
-		} else if(VAR == "nSelectedChargedTracks"){
+		} else if(VAR == "nChargedTracks"){
 			mg->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			mg->GetYaxis()->SetTitle("dY_{S}/dMult");
 			mg->GetXaxis()->SetLimits(0, 110);
@@ -650,7 +650,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		} else if(VAR == "Bpt"){
 			mg_par->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			mg_par->GetXaxis()->SetLimits(0 ,80); 
-		} else if(VAR == "nSelectedChargedTracks"){
+		} else if(VAR == "nChargedTracks"){
 			mg_par->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			mg_par->GetXaxis()->SetLimits(0, 110);
 		}
@@ -681,7 +681,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		} else if(VAR == "Bpt"){
 			mg_resol->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 			mg_resol->GetXaxis()->SetLimits(0, 100); 
-		} else if(VAR == "nSelectedChargedTracks"){
+		} else if(VAR == "nChargedTracks"){
 			mg_resol->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			mg_resol->GetXaxis()->SetLimits(0, 110);
 		}
@@ -719,7 +719,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			} else if(VAR == "Bpt"){
 				mg_chi2_sigsum->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 				mg_chi2_sigsum->GetXaxis()->SetLimits(0 ,80);
-			} else if(VAR == "nSelectedChargedTracks"){
+			} else if(VAR == "nChargedTracks"){
 				mg_chi2_sigsum->GetXaxis()->SetTitle("Multiplicity (Mult)");
 				mg_chi2_sigsum->GetXaxis()->SetLimits(0, 110);
 			}
@@ -759,7 +759,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			} else if(VAR == "Bpt"){
 				mg_chi2_backsum->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
 				mg_chi2_backsum->GetXaxis()->SetLimits(0 ,80);
-			} else if(VAR == "nSelectedChargedTracks"){
+			} else if(VAR == "nChargedTracks"){
 				mg_chi2_backsum->GetXaxis()->SetTitle("Multiplicity (Mult)");
 				mg_chi2_backsum->GetXaxis()->SetLimits(0, 110);
 			}
@@ -824,7 +824,7 @@ defineBinning(const TString& var, const TString& tree, int full)
         if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") nBins = N_pt_Bins_X;
         else                 nBins = N_pt_Bins_B;
     } else if (var == "By")  {nBins = N_y_Bins_X;
-    } else if (var == "nSelectedChargedTracks"){nBins = N_mult_Bins_X;
+    } else if (var == "nChargedTracks"){nBins = N_mult_Bins_X;
 	} else if (var == "Cent" || var == "CentBin"){nBins = N_cent_Bins_X;}
 
     std::vector<double> varBINS;
@@ -845,7 +845,7 @@ defineBinning(const TString& var, const TString& tree, int full)
         }
     }
 	else if (var == "By")   {for(int c = 0; c <= nBins; ++c){varBINS[c] = ybinsvec[c];}}
-	else if (var == "nSelectedChargedTracks"){for(int c = 0; c <= nBins; ++c){varBINS[c] = nmbinsvec[c];}} 
+	else if (var == "nChargedTracks"){for(int c = 0; c <= nBins; ++c){varBINS[c] = nmbinsvec[c];}}
 	else if (var == "Cent" || var == "CentBin") {for(int c = 0; c <= nBins; ++c){varBINS[c] = centbinsvec[c];}}
 
     return { nBins, varBINS };

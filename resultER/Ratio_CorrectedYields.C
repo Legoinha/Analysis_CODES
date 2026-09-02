@@ -21,7 +21,7 @@
 // Total systematic boxes are read from ntmix_UNCpropagator.C outputs.
 // root -l -b -q 'Ratio_CorrectedYields.C()'
 // root -l -b -q 'Ratio_CorrectedYields.C("ppRef","Bpt")'
-// root -l -b -q 'Ratio_CorrectedYields.C("ppRef","nSelectedChargedTracks")'
+// root -l -b -q 'Ratio_CorrectedYields.C("ppRef","nChargedTracks")'
 
 static const TString kPromptFractionFile = "../plotER/nonPrompt_STUDY_lxy/nonprompt_lxy_fraction_Bpt.root";
 
@@ -156,6 +156,7 @@ static void SaveRun1Comparison(TH1D* hNominal, TH1D* hNominalSyst, TString syste
 {
     if (!hNominal || var != "Bpt") return;
 
+    // https://www.hepdata.net/record/ins1219950?version=1&table=Table%201
     double run1Bins[] = {10.0, 13.5, 15.0, 18.0, 30.0, 50.0};
     double run1R[]    = {0.0727, 0.0671, 0.0687, 0.0601, 0.0780};
     double run1Stat[] = {0.0079, 0.0072, 0.0055, 0.0042, 0.0130};

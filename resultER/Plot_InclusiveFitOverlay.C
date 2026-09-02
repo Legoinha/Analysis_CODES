@@ -219,7 +219,7 @@ bool DrawOverlayCase(FitSet& xSet, FitSet& psiSet, TString SYSTEM, TString VAR, 
         outHigh = high;
         TString varLabel = VAR;
         if (VAR == "By") varLabel = "|y|";
-        else if (VAR == "nSelectedChargedTracks") varLabel = "n_{ch}";
+        else if (VAR == "nChargedTracks") varLabel = "n_{ch}";
         else if (VAR == "CentBin") varLabel = "Centrality (%)";
         if (VAR == "Bpt") varBinLabel = Form("%.0f < p_{T} < %.0f GeV/c", low, high);
         else varBinLabel = Form("%.0f < %s < %.0f", low, varLabel.Data(), high);

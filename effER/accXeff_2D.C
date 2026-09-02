@@ -206,8 +206,8 @@ void accXeff_2D(
     hACC_1D->Write();
     cACC->Write();
     fout_ACC->Close();
-    std::cout << "\n\n --- EFF calculation --- \n " << std::endl;
 
+    std::cout << "\n\n --- EFF calculation --- \n " << std::endl;
     TString SelectionEFF = "(" + GetEffSelectionCut(treename, SYSTEM) + ")" ;
     std::cout << "EFF Selection cuts: " << SelectionEFF << "\n" << std::endl;
     std::cout << "W/ quality + selection cuts: " <<  tree_reco->GetEntries(SelectionEFF) << " surviving SEL cuts" << std::endl;

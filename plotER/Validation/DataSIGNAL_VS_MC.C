@@ -11,7 +11,6 @@
 #include <TTreeFormula.h>
 #include <TParameter.h>
 #include <TLatex.h>
-#include <TObjString.h>
 
 #include <RooRealVar.h>
 #include <RooArgSet.h>
@@ -27,6 +26,7 @@
 #include <vector>
 #include <cmath>
 #include <memory>
+#include <algorithm>
 
 #include "aux.h"
 #include "../../fitER/aux/uti.h"
@@ -50,9 +50,7 @@ static void fillMCHistFromTree(TTree* tree, TH1D* hist, const TString& expr, con
     std::vector<std::unique_ptr<TTreeFormula>> reweightFormulas;
     for (std::size_t i = 0; i < reweightInputs.size(); ++i) {
         const auto& input = reweightInputs[i];
-        if (input.hist && !input.expr.IsNull() && input.expr.Length() > 0) {
-            reweightFormulas.emplace_back(new TTreeFormula(Form("reweightFormula_%d", static_cast<int>(i)), input.expr.Data(), tree));
-        }
+        reweightFormulas.emplace_back(new TTreeFormula(Form("reweightFormula_%d", static_cast<int>(i)), input.expr.Data(), tree));
     }
 
     Int_t currentTree = -1;
@@ -80,21 +78,22 @@ static void fillMCHistFromTree(TTree* tree, TH1D* hist, const TString& expr, con
 }
 
 void DataSIGNAL_VS_MC(
-    TString dataPath  = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/DATA_with_score.root",
-    TString mcPath    = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/MC_with_score.root",
-    TString modelPath = "/eos/user/h/hmarques/Analysis_CODES/fitER/ROOTfiles/ppRef/nominalFitModel_ntmix_X3872_ppRef.root",
-    TString baseCut   = "BQvalue < 0.15 && Prediction > 0.58 && Bpt > 7.5 && Bpt < 50",
-    TString treeName  = "ntmix_X3872",
-    TString systemName = "ppRef",
-    bool REWEIGHT_MC = false,
-    TString weightPath = "",
-    TString reweightVariable = "Prediction",
-    TString whichWeight = "self")
+    TString dataPath,
+    TString mcPath,
+    TString modelPath,
+    TString baseCut,
+    TString treeName,
+    TString dataTree,
+    TString massAxisTitle,
+    bool REWEIGHT_MC,
+    TString weightPath,
+    TString reweightVariable,
+    TString selectedWeightParticleTag)
 {
     gStyle->SetOptStat(0);
     gStyle->SetOptTitle(0);
+    const bool isNtKp = (treeName == "ntKp");
 
-    const TString particleTag = signalParticleTag(treeName);
     TString outDir = Form("COMPARE/%s", treeName.Data());
     if (REWEIGHT_MC) outDir = Form("COMPARE/%s/reweightMC_comparison", treeName.Data());
     gSystem->mkdir("COMPARE", true);
@@ -104,50 +103,13 @@ void DataSIGNAL_VS_MC(
     TFile* fData = TFile::Open(dataPath, "READ");
     TFile* fMC = TFile::Open(mcPath, "READ");
     TFile* fModel = TFile::Open(modelPath, "READ");
-    if (!fData || fData->IsZombie()) {
-        std::cerr << "[ERROR] Could not open data file: " << dataPath << std::endl;
-        return;
-    }
-    if (!fMC || fMC->IsZombie()) {
-        std::cerr << "[ERROR] Could not open MC file: " << mcPath << std::endl;
-        fData->Close();
-        return;
-    }
-    if (!fModel || fModel->IsZombie()) {
-        std::cerr << "[ERROR] Could not open fit model file: " << modelPath << std::endl;
-        fData->Close();
-        fMC->Close();
-        return;
-    }
 
     TTree* tData = nullptr;
     TTree* tMC = nullptr;
-    TString dataTree = treeName.BeginsWith("ntmix") ? "ntmix" : treeName;
     fData->GetObject(dataTree, tData);
     fMC->GetObject(treeName, tMC);
-    if (!tData) {
-        std::cerr << "[ERROR] Could not find data tree " << dataTree << " in " << dataPath << std::endl;
-        fData->Close();
-        fMC->Close();
-        fModel->Close();
-        return;
-    }
-    if (!tMC) {
-        std::cerr << "[ERROR] Could not find MC tree " << treeName << " in " << mcPath << std::endl;
-        fData->Close();
-        fMC->Close();
-        fModel->Close();
-        return;
-    }
 
     RooWorkspace* ws = (RooWorkspace*)fModel->Get("ws_nominal");
-    if (!ws) {
-        std::cerr << "[ERROR] Workspace ws_nominal missing in " << modelPath << std::endl;
-        fData->Close();
-        fMC->Close();
-        fModel->Close();
-        return;
-    }
     RooRealVar* meanVar = ws->var("mean1_");
     RooRealVar* sigma1 = ws->var("sigma11_");
     RooRealVar* sigma2 = ws->var("sigma21_");
@@ -156,25 +118,12 @@ void DataSIGNAL_VS_MC(
     RooAbsPdf* model = ws->pdf("model1_");
     RooRealVar* nsig = ws->var("nsig1_");
     RooRealVar* nbkg = ws->var("nbkg1_");
-    RooRealVar* nbkgPartR = ws->var("nbkg_part_r1_");
-    if (!meanVar || !sigma1 || !sigma2 || !sig1frac || !scale || !model || !nsig || !nbkg) {
-        std::cerr << "[ERROR] Fit model is missing one or more required workspace objects." << std::endl;
-        fData->Close();
-        fMC->Close();
-        fModel->Close();
-        return;
-    }
+    RooRealVar* nbkgPartR = nullptr;
+    if (isNtKp) nbkgPartR = ws->var("nbkg_part_r1_");
 
     TParameter<int>* nMassBinsPar = (TParameter<int>*)fModel->Get("nMassBins");
     TParameter<double>* massMinPar = (TParameter<double>*)fModel->Get("massMin");
     TParameter<double>* massMaxPar = (TParameter<double>*)fModel->Get("massMax");
-    if (!nMassBinsPar || !massMinPar || !massMaxPar) {
-        std::cerr << "[ERROR] Fit model is missing nMassBins/massMin/massMax metadata." << std::endl;
-        fData->Close();
-        fMC->Close();
-        fModel->Close();
-        return;
-    }
     const int nMassBins = nMassBinsPar->GetVal();
     const double massMin = massMinPar->GetVal();
     const double massMax = massMaxPar->GetVal();
@@ -197,7 +146,6 @@ void DataSIGNAL_VS_MC(
     const double sbLHi = mean - sidebandInNSigma * sigma;
     const double sbRLo = mean + sidebandInNSigma * sigma;
     const double sbRHi = mean + sidebandOutNSigma * sigma;
-    const bool isNtKp = (treeName == "ntKp");
     const double sidebandWidth = isNtKp ? (sbRHi - sbRLo) : ((sbLHi - sbLLo) + (sbRHi - sbRLo));
     const double alpha = (sidebandWidth > 0.0) ? (sigHi - sigLo) / sidebandWidth : 0.0;
 
@@ -206,7 +154,7 @@ void DataSIGNAL_VS_MC(
     std::cout << "  Sideband region (" << sidebandInNSigma << "-" << sidebandOutNSigma << "sigma): ["
               << sbLLo << ", " << sbLHi << "] U [" << sbRLo << ", " << sbRHi << "]" << std::endl;
 
-    TH1D* hMassWin = new TH1D("hMassWin_tmp", Form(";%s;", massFinalStateAxisTitle(treeName).Data()), nMassBins, massMin, massMax);
+    TH1D* hMassWin = new TH1D("hMassWin_tmp", Form(";%s;", massAxisTitle.Data()), nMassBins, massMin, massMax);
     const double massBinWidthMeV = 1000.0 * (massMax - massMin) / nMassBins;
     hMassWin->GetYaxis()->SetTitle(Form("Entries / %.4g MeV/c^{2}", massBinWidthMeV));
     tData->Draw("Bmass>>hMassWin_tmp", baseCut, "goff");
@@ -263,69 +211,56 @@ void DataSIGNAL_VS_MC(
     delete hMassWin;
 
     auto vars = getSignalVars(treeName);
-
     std::vector<VarCfgSignal> availableVars;
-    availableVars.reserve(vars.size());
-    for (const auto& v : vars) {
-        const TString baseVar = baseVarFromExpr(v.expr);
-        if (!tData->GetBranch(baseVar.Data()) || (!tMC->GetBranch(baseVar.Data()))) {
-            std::cout << "[vars] Skipping " << baseVar << ": missing " << dataTree << std::endl;
+    for (const auto& var : vars) {
+        if (!tData->GetBranch(var.expr) || !tMC->GetBranch(var.expr)) {
+            std::cout << "Variable not available: " << var.expr << std::endl;
             continue;
         }
-        availableVars.push_back(v);
+        availableVars.push_back(var);
     }
     vars.swap(availableVars);
 
     if (REWEIGHT_MC) {
         std::vector<VarCfgSignal> reweightCfgs;
-        for (const auto& requestedVar : splitReweightVariableList(reweightVariable)) {
-            VarCfgSignal reweightCfg;
-            if (!resolveSignalVar(vars, requestedVar, reweightCfg)) {
-                std::cerr << "[ERROR] Reweight variable '" << requestedVar << "' from request '"
-                          << reweightVariable << "' is not available for " << treeName << std::endl;
-                return;
+        TString requestedVariables = reweightVariable;
+        while (requestedVariables.Length() > 0) {
+            const Ssiz_t comma = requestedVariables.First(',');
+            TString requestedVar = requestedVariables;
+            if (comma >= 0) {
+                requestedVar = requestedVariables(0, comma);
+                requestedVariables.Remove(0, comma + 1);
+            } else {
+                requestedVariables = "";
             }
-            reweightCfgs.push_back(reweightCfg);
+
+            const auto reweightCfg = std::find_if(vars.begin(), vars.end(), [&](const VarCfgSignal& var) {
+                return requestedVar == var.expr;
+            });
+            if (reweightCfg == vars.end()) {
+                std::cout << "Variable not available: " << requestedVar << std::endl;
+                continue;
+            }
+            reweightCfgs.push_back(*reweightCfg);
         }
-        reweightTag = reweightListTag(reweightCfgs);
-        if (reweightCfgs.empty() || reweightTag.IsNull() || reweightTag.Length() == 0) {
-            std::cerr << "[ERROR] Empty reweight tag after resolving request '" << reweightVariable
-                      << "'. Refusing to create an unnamed reweight output folder." << std::endl;
-            return;
+        for (std::size_t i = 0; i < reweightCfgs.size(); ++i) {
+            if (i > 0) reweightTag += "__";
+            reweightTag += reweightCfgs[i].expr;
         }
-        const TString selectedWeightParticleTag = weightParticleTag(treeName, whichWeight);
         const TString reweightFolderTag = Form("%s__weights%s", reweightTag.Data(), selectedWeightParticleTag.Data());
         outDir = Form("COMPARE/%s/reweightMC_comparison/%s", treeName.Data(), reweightFolderTag.Data());
         gSystem->mkdir(outDir, true);
 
-        if (weightPath.IsNull() || weightPath.Length() == 0) {
-            weightPath = Form("WEIGHTS/%s", signalWeightFileName(systemName, treeName, selectedWeightParticleTag).Data());
-        }
-        std::cout << "Using " << selectedWeightParticleTag << " 1-D weight source (whichWeight=" << whichWeight << ")" << std::endl;
+        std::cout << "Using " << selectedWeightParticleTag << " 1-D weight source" << std::endl;
         TFile* fWeight = TFile::Open(Form("file:%s", weightPath.Data()), "READ");
-        if (!fWeight || fWeight->IsZombie()) {
-            std::cerr << "[ERROR] Weight file not found or corrupted: " << weightPath << std::endl;
-            return;
-        }
         for (std::size_t i = 0; i < reweightCfgs.size(); ++i) {
-            const TString tag = signalVarTag(reweightCfgs[i]);
-            if (tag.IsNull() || tag.Length() == 0) {
-                std::cerr << "[ERROR] Empty tag for reweight variable from request '" << reweightVariable << "'" << std::endl;
-                fWeight->Close();
-                return;
-            }
+            const TString tag = reweightCfgs[i].expr;
             TString histName = Form("hWeight_%s", tag.Data());
             TH1D* hWeight = (TH1D*)fWeight->Get(histName.Data());
-            if (!hWeight && tag == "Prediction") hWeight = (TH1D*)fWeight->Get("hWeight");
-            if (!hWeight) {
-                std::cerr << "[ERROR] " << histName << " missing in: " << weightPath << std::endl;
-                std::cerr << "        Run the nominal validation again to create variable-specific 1-D weights." << std::endl;
-                fWeight->Close();
-                return;
-            }
             TH1D* clonedWeight = (TH1D*)hWeight->Clone(Form("hWeight_runtime_%s_%d", tag.Data(), static_cast<int>(i)));
             clonedWeight->SetDirectory(nullptr);
-            reweightInputs.push_back({signalVarExpr(reweightCfgs[i]), tag, clonedWeight});
+            const TString expr = reweightCfgs[i].absVal ? Form("abs(%s)", reweightCfgs[i].expr.Data()) : reweightCfgs[i].expr;
+            reweightInputs.push_back({expr, tag, clonedWeight});
         }
         fWeight->Close();
         std::cout << "Running reweighted validation with ordered weights " << reweightTag
@@ -340,7 +275,7 @@ void DataSIGNAL_VS_MC(
 
     for (const auto& v : vars) {
         TString expr = v.absVal ? Form("abs(%s)", v.expr.Data()) : v.expr;
-        TString tag = makeTag(expr);
+        TString tag = v.expr;
 
         TH1D* hDataSR = new TH1D(Form("hDataSR_%s_%s", tag.Data(), treeName.Data()), v.title, v.nbins, v.xmin, v.xmax);
         TH1D* hDataSB = new TH1D(Form("hDataSB_%s_%s", tag.Data(), treeName.Data()), v.title, v.nbins, v.xmin, v.xmax);
@@ -358,13 +293,13 @@ void DataSIGNAL_VS_MC(
         hSideband->Add(hDataSR);
         hSideband->Add(hDataSB, -alpha);
 
-        if (REWEIGHT_MC && !reweightInputs.empty()) { fillMCHistFromTree(tMC, hMC, expr, cutMC, reweightInputs); }
+        if (REWEIGHT_MC) { fillMCHistFromTree(tMC, hMC, expr, cutMC, reweightInputs); }
         else { tMC->Draw(Form("%s>>%s", expr.Data(), hMC->GetName()), cutMC, "goff"); }
 
         if (hSideband->Integral() > 0) hSideband->Scale(1.0 / hSideband->Integral());
         if (hMC->Integral() > 0) hMC->Scale(1.0 / hMC->Integral());
 
-        hists.push_back({v, tag, baseVarFromExpr(v.expr), hSideband, hSPlot, hMC});
+        hists.push_back({v, tag, v.expr, hSideband, hSPlot, hMC});
         delete hDataSR;
         delete hDataSB;
     }
@@ -373,23 +308,19 @@ void DataSIGNAL_VS_MC(
     RooArgSet obs(Bmass);
     std::vector<std::unique_ptr<RooRealVar>> extraObs;
     auto addObsIfAvailable = [&](const TString& name) {
-        if (name == "Bmass" || obs.find(name.Data())) return;
-        if (!tData->GetBranch(name.Data())) return;
-        extraObs.emplace_back(new RooRealVar(name, name, -1e6, 1e6));
-        obs.add(*extraObs.back());
+        if (name != "Bmass" && !obs.find(name.Data())) {
+            extraObs.emplace_back(new RooRealVar(name, name, -1e6, 1e6));
+            obs.add(*extraObs.back());
+        }
     };
     for (const auto& h : hists) {
         addObsIfAvailable(h.baseVar);
     }
-    for (const TString& cutVar : {TString("Bpt"), TString("BQvalue"), TString("Btrk1dR"), TString("Btrk2dR"),
-                                  TString("Prediction"), TString("Bnorm_svpvDistance_2D")}) {
-        addObsIfAvailable(cutVar);
-    }
-
     TString dataCut = Form("(%s) && (Bmass>%f && Bmass<%f)", baseCut.Data(), massMin, massMax);
     RooDataSet data("data", "data", tData, obs, dataCut.Data());
-    for (RooRealVar* y : {nsig, nbkg, nbkgPartR}) {
-        if (!y) continue;
+    std::vector<RooRealVar*> fitYields = {nsig, nbkg};
+    if (isNtKp) fitYields.push_back(nbkgPartR);
+    for (RooRealVar* y : fitYields) {
         double ymin = y->getMin();
         double ymax = y->getMax();
         if (ymin > 0.0) ymin = 0.0;
@@ -403,16 +334,16 @@ void DataSIGNAL_VS_MC(
     TObject* obj = nullptr;
     while ((obj = it->Next())) {
         RooRealVar* v = dynamic_cast<RooRealVar*>(obj);
-        if (v) v->setConstant(true);
+        v->setConstant(true);
     }
     nsig->setConstant(false);
     nbkg->setConstant(false);
-    if (nbkgPartR) nbkgPartR->setConstant(false);
+    if (isNtKp) nbkgPartR->setConstant(false);
 
     RooFitResult* fitRes = model->fitTo(data, Extended(true), Save(true), PrintLevel(-1));
     RooArgList splotYields;
     splotYields.add(*nsig);
-    if (nbkgPartR) splotYields.add(*nbkgPartR);
+    if (isNtKp) splotYields.add(*nbkgPartR);
     splotYields.add(*nbkg);
     RooStats::SPlot sData("sData", "An SPlot", data, model, splotYields);
 
@@ -440,7 +371,7 @@ void DataSIGNAL_VS_MC(
     RooPlot* frame = Bmass.frame();
     frame->SetTitle("");
     frame->SetStats(0);
-    frame->GetXaxis()->SetTitle(massFinalStateAxisTitle(treeName));
+    frame->GetXaxis()->SetTitle(massAxisTitle);
     frame->GetXaxis()->SetTitleSize(0.030);
     frame->GetXaxis()->SetTitleOffset(1.25);
     frame->GetXaxis()->CenterTitle();
@@ -461,12 +392,13 @@ void DataSIGNAL_VS_MC(
     std::unique_ptr<RooArgSet> components(model->getComponents());
     RooAbsPdf* sigPdf = dynamic_cast<RooAbsPdf*>(components->find("sig_doubleG1_"));
     RooAbsPdf* bkgPdf = dynamic_cast<RooAbsPdf*>(components->find("bkg1_"));
-    RooAbsPdf* partPdf = dynamic_cast<RooAbsPdf*>(components->find("erfc1"));
+    RooAbsPdf* partPdf = nullptr;
+    if (isNtKp) partPdf = dynamic_cast<RooAbsPdf*>(components->find("erfc1"));
 
-    if (sigPdf) model->plotOn(frame, Name("signal_splot_fit"), Components(*sigPdf), DrawOption("LF"), FillStyle(3002), FillColor(signalColor), LineStyle(7), LineColor(signalColor), LineWidth(1), Precision(1e-6));
-    if (partPdf) model->plotOn(frame, Name("partial_reco_splot_fit"), Components(*partPdf), DrawOption("L"), LineStyle(9), LineColor(kGreen + 3), LineWidth(2), Precision(1e-6));
+    model->plotOn(frame, Name("signal_splot_fit"), Components(*sigPdf), DrawOption("LF"), FillStyle(3002), FillColor(signalColor), LineStyle(7), LineColor(signalColor), LineWidth(1), Precision(1e-6));
+    if (isNtKp) model->plotOn(frame, Name("partial_reco_splot_fit"), Components(*partPdf), DrawOption("L"), LineStyle(9), LineColor(kGreen + 3), LineWidth(2), Precision(1e-6));
     model->plotOn(frame, Name("model_splot_fit"), Precision(1e-6), DrawOption("L"), LineColor(kRed), LineWidth(1));
-    if (bkgPdf) model->plotOn(frame, Name("background_splot_fit"), Components(*bkgPdf), Precision(1e-6), DrawOption("L"), LineStyle(7), LineColor(kBlue + 1), LineWidth(2));
+    model->plotOn(frame, Name("background_splot_fit"), Components(*bkgPdf), Precision(1e-6), DrawOption("L"), LineStyle(7), LineColor(kBlue + 1), LineWidth(2));
     frame->getAttFill()->SetFillStyle(0);
     frame->Draw();
 
@@ -477,12 +409,9 @@ void DataSIGNAL_VS_MC(
     legMass->SetTextSize(0.035);
     legMass->AddEntry(frame->findObject("data_splot_fit"), "Data", "lep");
     legMass->AddEntry(frame->findObject("model_splot_fit"), "Fit Model", "l");
-    TObject* bkgObj = bkgPdf ? frame->findObject("background_splot_fit") : nullptr;
-    TObject* sigObj = sigPdf ? frame->findObject("signal_splot_fit") : nullptr;
-    TObject* partObj = partPdf ? frame->findObject("partial_reco_splot_fit") : nullptr;
-    if (bkgObj) legMass->AddEntry(bkgObj, "Comb. Bkg.", "l");
-    if (sigObj) legMass->AddEntry(sigObj, FitParticleLabel(treeName, true), "f");
-    if (partObj) legMass->AddEntry(partObj, "Partial reco.", "l");
+    legMass->AddEntry(frame->findObject("background_splot_fit"), "Comb. Bkg.", "l");
+    legMass->AddEntry(frame->findObject("signal_splot_fit"), FitParticleLabel(treeName, true), "f");
+    if (isNtKp) legMass->AddEntry(frame->findObject("partial_reco_splot_fit"), "Partial reco.", "l");
     legMass->Draw();
 
     TLatex label;
@@ -493,7 +422,7 @@ void DataSIGNAL_VS_MC(
     label.SetTextSize(0.030);
     label.DrawLatex(0.16, 0.80, Form("N_{sig} = %.1f #pm %.1f", nsig->getVal(), nsig->getError()));
     label.DrawLatex(0.16, 0.75, Form("N_{bkg} = %.1f #pm %.1f", nbkg->getVal(), nbkg->getError()));
-    if (nbkgPartR) label.DrawLatex(0.16, 0.70, Form("N_{part} = %.1f #pm %.1f", nbkgPartR->getVal(), nbkgPartR->getError()));
+    if (isNtKp) label.DrawLatex(0.16, 0.70, Form("N_{part} = %.1f #pm %.1f", nbkgPartR->getVal(), nbkgPartR->getError()));
 
     cMass->SaveAs(Form("COMPARE/%s/massFit_splot_%s.pdf", treeName.Data(), treeName.Data()));
     delete legMass;
@@ -512,22 +441,13 @@ void DataSIGNAL_VS_MC(
     }
 
     TFile* fWeights = nullptr;
-    TString weightOutputPath = Form("WEIGHTS/%s", signalWeightFileName(systemName, treeName, particleTag).Data());
+    TString weightOutputPath = weightPath;
     if (!REWEIGHT_MC) {
         gSystem->mkdir("WEIGHTS", true);
         fWeights = TFile::Open(Form("file:%s", weightOutputPath.Data()), "RECREATE");
-        if (!fWeights || fWeights->IsZombie()) {
-            std::cerr << "[ERROR] Could not create weight file: " << weightOutputPath << std::endl;
-            if (fWeights) {
-                fWeights->Close();
-                delete fWeights;
-            }
-            fWeights = nullptr;
-        }
     }
 
     for (auto& h : hists) {
-        if (h.baseVar == "Bnorm_trk1Dxy" || h.baseVar == "Balpha") continue;
 
         h.mc->SetLineColor(kOrange + 7);
         h.mc->SetLineWidth(2);
@@ -541,11 +461,10 @@ void DataSIGNAL_VS_MC(
         h.splot->SetLineWidth(2);
 
         TH1D* hWeight = nullptr;
-        if (fWeights) {
+        if (!REWEIGHT_MC) {
             hWeight = makeWeightHist(h.splot, h.mc, Form("hWeight_%s", h.tag.Data()));
             fWeights->cd();
             hWeight->Write();
-            if (h.tag == "Prediction") hWeight->Write("hWeight");
         }
 
         TH1D* hMCBand = (TH1D*)h.mc->Clone(Form("hMCBand_cmp_%s", h.tag.Data()));
@@ -664,43 +583,15 @@ void DataSIGNAL_VS_MC(
         delete hMCBand;
     }
 
-    if (fWeights) fWeights->Close();
+    if (!REWEIGHT_MC) fWeights->Close();
     for (auto& h : hists) {
         delete h.sideband;
         delete h.splot;
         delete h.mc;
     }
     for (auto& input : reweightInputs) delete input.hist;
-    if (fitRes) delete fitRes;
+    delete fitRes;
     delete allPars;
-
-    // Save the full dataset with sWeights for later 2-D validation/reweighting.
-    if (!REWEIGHT_MC) {
-        gSystem->mkdir("WEIGHTS", true);
-        TString splotWeightsPath = Form("WEIGHTS/%s", sPlotSignalWeightFileName(systemName, treeName).Data());
-        TFile* fSplotWeights = TFile::Open(Form("file:%s", splotWeightsPath.Data()), "RECREATE");
-        if (!fSplotWeights || fSplotWeights->IsZombie()) {
-            std::cerr << "[ERROR] Could not create sPlot weights file: " << splotWeightsPath << std::endl;
-        } else {
-            fSplotWeights->cd();
-            data.Write("data");
-            TObjString savedBaseCut(baseCut);
-            TObjString savedDataCut(dataCut);
-            TObjString savedTreeName(treeName);
-            TObjString savedSystemName(systemName);
-            TParameter<double> savedMassMin("massMin", massMin);
-            TParameter<double> savedMassMax("massMax", massMax);
-            savedBaseCut.Write("baseCut");
-            savedDataCut.Write("dataCut");
-            savedTreeName.Write("treeName");
-            savedSystemName.Write("systemName");
-            savedMassMin.Write();
-            savedMassMax.Write();
-            fSplotWeights->Close();
-            std::cout << "Saved sPlot weights dataset to " << splotWeightsPath << std::endl;
-        }
-        delete fSplotWeights;
-    }
 
     fData->Close();
     fMC->Close();
@@ -709,8 +600,7 @@ void DataSIGNAL_VS_MC(
     if (REWEIGHT_MC) {
         std::cout << "Done. Outputs: " << outDir << "/*.pdf" << std::endl;
     } else {
-        std::cout << "Done. Outputs: COMPARE/" << treeName << "/*.pdf, WEIGHTS/"
-                  << sPlotSignalWeightFileName(systemName, treeName)
-                  << ", " << weightOutputPath << std::endl;
+        std::cout << "Done. Outputs: COMPARE/" << treeName << "/*.pdf, "
+                  << weightOutputPath << std::endl;
     }
 }
