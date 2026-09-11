@@ -64,6 +64,20 @@ def plot_correlation_dataMC(tree="X3872", system_name="ppRef"):
         "Bmass",
         "BQvalue",
         "Bpt",
+        "Bnorm_svpvDistance_2D",
+        "Balpha",
+        "Bnorm_trk1Dxy",
+        "Bnorm_trk1Dz",
+        "Btktkpt",
+        "BujvProb",
+        "Btrk1Eta",
+        "Btrk1Phi",
+        "Bmu1pt",
+        "Bmu1eta",
+        "Bmu1phi",
+        "Bujpt",
+        "Bujeta",
+        "Bujphi",
     ]
 
     path_to_data, path_to_mc, data_tree_name, mc_tree_name = resolve_paths(tree, system_name)

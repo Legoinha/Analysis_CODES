@@ -40,6 +40,12 @@ bool hasVariableForDraw(TTree *tree, TString var)
     return false;
 }
 
+TString mcSelection(TTree *tree, const TString &selection)
+{
+    if (!tree->GetBranch("pThatreweight")) return selection;
+    return Form("(%s) * pThatreweight", selection.Data());
+}
+
 void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
 {
     gSystem->Exec("mkdir -p ./presel_STUDY_vars/");
@@ -75,7 +81,7 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         {"BsvpvDistance_2D",           0.0,  0.25},
         {"BsvpvDisErr_2D",             0.0,  0.05},
         {"BQvalue",                    0.0,  0.6},
-        {"Bnorm_trk1Dxy",             -5.0,  5.0},
+        {"Bnorm_trk1Dxy",             -7.0,  7.0},
         {"Bnorm_trk2Dxy",             -5.0,  5.0},
         {"Balpha",                     0.0,  3.2},
         {"Bdtheta",                   -3.2,  3.2},
@@ -230,7 +236,8 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
 
         TString ANYsel = "1"; // Prediction > 0.59
         TString ANA_region = "Bpt > 7.5 && Bpt < 50"; // Bpt > 10 && abs(By) < 1.6
-        tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), Form(" %s && %s", ANYsel.Data(), ANA_region.Data()));
+        const TString mcCut = Form("%s && %s", ANYsel.Data(), ANA_region.Data());
+        tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), mcSelection(tree_MC, mcCut));
         chain.Draw(Form("%s >> hist_BKG", var.Data()), Form(" %s && %s && %s", sideband.Data(), ANYsel.Data(), ANA_region.Data()));
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -244,7 +251,8 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         hist_SIG->SetMinimum(0.0);
 
         if (tree_MC_spec) {
-            tree_MC_spec->Draw(Form("%s >> hist_spec", var.Data()), Form(" %s && %s", ANYsel.Data(), ANA_region.Data()));
+            tree_MC_spec->Draw(Form("%s >> hist_spec", var.Data()),
+                               mcSelection(tree_MC_spec, mcCut));
             hist_spec->SetLineWidth(3);
             hist_spec->SetFillStyle(0);
             if (hist_spec->Integral() > 0) hist_spec->Scale(1.0 / hist_spec->Integral(""));

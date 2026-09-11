@@ -17,6 +17,12 @@ bool hasVariableForDraw(TTree *tree, TString var)
     return false;
 }
 
+TString mcSelection(TTree *tree, const TString &selection)
+{
+    if (!tree->GetBranch("pThatreweight")) return selection;
+    return Form("(%s) * pThatreweight", selection.Data());
+}
+
 TString safePlotTag(TString var)
 {
     var.ReplaceAll("abs(", "abs_");
@@ -254,7 +260,8 @@ void plot2D_dataMC(TString TREE = "ntmix_PSI2S", TString systemNAME = "ppRef", T
         canvas.SaveAs(Form("%s/%s_%s_DATA_%s.pdf", outDir.Data(), outTag.Data(), systemNAME.Data(), map.tag.Data()));
 
         TH2F hMC(Form("hMC_%d", i), Form(";%s;%s;Entries", map.xLabel.Data(), map.yLabel.Data()), map.xBins, map.xMin, map.xMax, map.yBins, map.yMin, map.yMax);
-        treeMC->Draw(Form("%s:%s>>%s", map.yVar.Data(), map.xVar.Data(), hMC.GetName()), drawCut, "goff");
+        treeMC->Draw(Form("%s:%s>>%s", map.yVar.Data(), map.xVar.Data(), hMC.GetName()),
+                 mcSelection(treeMC, drawCut), "goff");
         hMC.SetDirectory(nullptr);
         hMC.Draw("COLZ");
         latex.DrawLatex(0.15, 0.91, Form("%s %s", systemNAME.Data(), mcLabel.Data()));

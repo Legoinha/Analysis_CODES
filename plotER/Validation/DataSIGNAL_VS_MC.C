@@ -47,6 +47,10 @@ static void fillMCHistFromTree(TTree* tree, TH1D* hist, const TString& expr, con
 {
     TTreeFormula exprFormula("exprFormula", expr.Data(), tree);
     TTreeFormula cutFormula("cutFormula", cut.Data(), tree);
+    std::unique_ptr<TTreeFormula> pThatFormula;
+    if (tree->GetBranch("pThatreweight")) {
+        pThatFormula.reset(new TTreeFormula("pThatFormula", "pThatreweight", tree));
+    }
     std::vector<std::unique_ptr<TTreeFormula>> reweightFormulas;
     for (std::size_t i = 0; i < reweightInputs.size(); ++i) {
         const auto& input = reweightInputs[i];
@@ -61,15 +65,17 @@ static void fillMCHistFromTree(TTree* tree, TH1D* hist, const TString& expr, con
             currentTree = tree->GetTreeNumber();
             exprFormula.UpdateFormulaLeaves();
             cutFormula.UpdateFormulaLeaves();
+            if (pThatFormula) pThatFormula->UpdateFormulaLeaves();
             for (auto& formula : reweightFormulas) formula->UpdateFormulaLeaves();
         }
 
         exprFormula.GetNdata();
         cutFormula.GetNdata();
+        if (pThatFormula) pThatFormula->GetNdata();
         for (auto& formula : reweightFormulas) formula->GetNdata();
         if (cutFormula.EvalInstance() == 0.0) continue;
 
-        double weight = 1.0;
+        double weight = pThatFormula ? pThatFormula->EvalInstance() : 1.0;
         for (std::size_t iw = 0; iw < reweightFormulas.size(); ++iw) {
             weight *= lookupWeight1D(reweightInputs[iw].hist, reweightFormulas[iw]->EvalInstance());
         }
@@ -293,8 +299,7 @@ void DataSIGNAL_VS_MC(
         hSideband->Add(hDataSR);
         hSideband->Add(hDataSB, -alpha);
 
-        if (REWEIGHT_MC) { fillMCHistFromTree(tMC, hMC, expr, cutMC, reweightInputs); }
-        else { tMC->Draw(Form("%s>>%s", expr.Data(), hMC->GetName()), cutMC, "goff"); }
+        fillMCHistFromTree(tMC, hMC, expr, cutMC, reweightInputs);
 
         if (hSideband->Integral() > 0) hSideband->Scale(1.0 / hSideband->Integral());
         if (hMC->Integral() > 0) hMC->Scale(1.0 / hMC->Integral());

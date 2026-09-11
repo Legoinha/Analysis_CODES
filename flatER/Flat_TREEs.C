@@ -1,13 +1,18 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TChain.h>
+#include <TObjArray.h>
 #include <iostream>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
+#include <map>
 #include <string>
+#include <utility>
 #include "../plotER/aux/masses.h"
+#include "MCNormalization.h"
 
-void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TString SYSTEM="ppRef", TString KIND="MC", TString PARTICLE="", TString PVSNP="")
+void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TString SYSTEM="ppRef", TString KIND="MC", TString PARTICLE="", TString PVSNP="", TString MCNORMFILE="config/mc_normalization.csv")
 {
     bool isMC = (KIND == "MC");
     bool Fid_region  = true;       // apply fiducial region selection
@@ -36,12 +41,60 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     std::cout << "Total files added: "      << tin->GetNtrees() << std::endl;
     std::cout << "Total entries in chain: " << tin->GetEntries() << std::endl;
 
+    if (tin->GetNtrees() == 0) {
+        throw std::runtime_error("No input ROOT files were added from " + std::string(FILEIN.Data()));
+    }
+
+    // Resolve and validate every MC input before creating an output file. The
+    // same per-campaign entry is later used by both the reco and gen chains.
+    MCNormalization::Registry mcNormalization;
+    MCNormalization::Context mcContext;
+    std::map<std::string, MCNormalization::Entry> mcNormalizationByFile;
+    if (isMC) {
+        mcContext = MCNormalization::BuildContext(SYSTEM.Data(), TREENAME.Data(),
+                                                   PARTICLE.Data(), PVSNP.Data());
+        mcNormalization.Load(MCNORMFILE.Data());
+
+        std::map<std::string, std::pair<MCNormalization::Entry, int>> sampleSummary;
+        TObjArray *inputFiles = tin->GetListOfFiles();
+        if (!inputFiles || inputFiles->GetEntries() == 0) {
+            throw std::runtime_error("The MC chain has no input files to normalize");
+        }
+
+        TIter nextInput(inputFiles);
+        TObject *inputObject = nullptr;
+        while ((inputObject = nextInput())) {
+            const std::string fileName = inputObject->GetTitle();
+            const auto entry = mcNormalization.Resolve(fileName, mcContext);
+            mcNormalizationByFile[fileName] = entry;
+            const std::string summaryKey = entry.pathPattern + "|" + std::to_string(entry.pthat);
+            auto inserted = sampleSummary.emplace(summaryKey, std::make_pair(entry, 0));
+            ++inserted.first->second.second;
+        }
+
+        std::cout << "MC normalization table: " << MCNORMFILE << std::endl;
+        std::cout << "pThat sample normalization (xsec_pb * filter_eff / n_gen):" << std::endl;
+        for (const auto &item : sampleSummary) {
+            const auto &entry = item.second.first;
+            std::cout << "  pThat=" << std::setw(2) << entry.pthat
+                      << "  files=" << std::setw(3) << item.second.second
+                      << "  xsec(pb)=" << entry.xsecPb
+                      << "  filterEff=" << entry.filterEfficiency
+                      << "  nGen=" << entry.nGenerated
+                      << "  pThatreweight=" << std::setprecision(12) << entry.Weight()
+                      << std::setprecision(6) << std::endl;
+        }
+    }
+
     // --------------------------------------------------
     // Output file
     // --------------------------------------------------
     TString outputFile = "flat_" + TREENAME + "_" + SYSTEM + "_" + KIND + specCASES + NUN + ".root";  //
     TFile *fout = new TFile(outputFile, "RECREATE");
     TTree *tout = new TTree(TREENAME + PARTICLE, "Flattened tree");
+    // Do not leave intermediate autosaved cycles in chunk files. Besides making
+    // the file larger, such cycles can retain references to a chunk's old path.
+    tout->SetAutoSave(0);
 
     // --------------------------------------------------
     // Prepare gen-level input chain and output tree
@@ -59,6 +112,26 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     }
 
     TTree *tgenOut = nullptr;
+
+    auto updateMCWeight = [&](TChain *chain, Int_t &activeTreeNumber,
+                              Double_t &weight) {
+        const Int_t treeNumber = chain->GetTreeNumber();
+        if (treeNumber == activeTreeNumber) return;
+        activeTreeNumber = treeNumber;
+
+        if (!chain->GetFile()) {
+            throw std::runtime_error("Cannot determine the current MC input file");
+        }
+        const std::string fileName = chain->GetFile()->GetName();
+        auto match = mcNormalizationByFile.find(fileName);
+        if (match == mcNormalizationByFile.end()) {
+            // Handles harmless path spelling differences between TChainElement
+            // and the file opened by ROOT while preserving the same validation.
+            match = mcNormalizationByFile.emplace(
+                fileName, mcNormalization.Resolve(fileName, mcContext)).first;
+        }
+        weight = match->second.Weight();
+    };
 
     // --------------------------------------------------
     // Input reconstructed branches 
@@ -246,6 +319,7 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     float Bdoubletpt_out, Bdoubleteta_out, Bdoubletphi_out, Bdoublety_out;
     bool BdiTrackFitValid_out;
     int CentBin_out;
+    Double_t pThatreweight_out = 1.;
 
     tout->Branch("PVx", &PVx_out, "PVx/F");
     tout->Branch("PVy", &PVy_out, "PVy/F");
@@ -317,12 +391,14 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tout->Branch("Bnorm_trk2Dz", &Bnorm_trk2Dz_out, "Bnorm_trk2Dz/F");
     if (isMC){
         tout->Branch("Bgen", &Bgen_out, "Bgen/F");
+        tout->Branch("pThatreweight", &pThatreweight_out, "pThatreweight/D");
     }
 
     // --------------------------------------------------
     // Event loop
     // --------------------------------------------------
     Long64_t nentries = tin->GetEntries();
+    Int_t activeRecoTreeNumber = -1;
     std::cout << "Processing " << nentries << " entries..." << std::endl;
     for(Long64_t ev=0; ev<nentries; ++ev)
     {
@@ -331,6 +407,8 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
             std::cout << "Processing event " << ev << " / " << nentries 
                       << " (" << (100.0*ev/nentries) << "%)" << std::endl;
         }
+        if (tin->LoadTree(ev) < 0) break;
+        if (isMC) updateMCWeight(tin, activeRecoTreeNumber, pThatreweight_out);
         tin->GetEntry(ev);
 
         // Event-level variables
@@ -505,9 +583,11 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
 
         // Output tree (flat)
         tgenOut = new TTree("ntGen", "Gen-level (flat, filtered)");
+        tgenOut->SetAutoSave(0);
         Float_t Gmu1eta_out, Gmu1pt_out, Gmu2eta_out, Gmu2pt_out;
         Float_t Gtk1pt_out, Gtk1eta_out, Gtk2pt_out, Gtk2eta_out, Gpt_out, Gy_out;
         Int_t GpdgId_out;
+        Double_t pThatreweight_gen_out = 1.;
         tgenOut->Branch("Gmu1eta", &Gmu1eta_out, "Gmu1eta/F");
         tgenOut->Branch("Gmu1pt", &Gmu1pt_out, "Gmu1pt/F");
         tgenOut->Branch("Gmu2eta", &Gmu2eta_out, "Gmu2eta/F");
@@ -519,9 +599,13 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
         tgenOut->Branch("GpdgId", &GpdgId_out, "GpdgId/I");
         tgenOut->Branch("Gpt", &Gpt_out, "Gpt/F");
         tgenOut->Branch("Gy", &Gy_out, "Gy/F");
+        tgenOut->Branch("pThatreweight", &pThatreweight_gen_out, "pThatreweight/D");
 
         const Long64_t ngen = tgen->GetEntries();
+        Int_t activeGenTreeNumber = -1;
         for (Long64_t ev=0; ev<ngen; ++ev) {
+            if (tgen->LoadTree(ev) < 0) break;
+            updateMCWeight(tgen, activeGenTreeNumber, pThatreweight_gen_out);
             tgen->GetEntry(ev);
             for (int i=0; i<Gsize; ++i) {
 
@@ -554,9 +638,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
 
     std::cout << "Output tree has " << tout->GetEntries() << " entries" << std::endl;
     // Write trees (only two top-level trees)
-    tout->Write();
-    if (isMC && tgenOut) tgenOut->Write();
+    tout->Write("", TObject::kOverwrite);
+    if (isMC && tgenOut) tgenOut->Write("", TObject::kOverwrite);
+    fout->Purge();
     fout->Close();
     delete tin;
+    delete tgen;
+    delete fout;
     std::cout << "Done & Saved -> " << outputFile << "\n";
 }

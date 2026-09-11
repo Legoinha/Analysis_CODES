@@ -80,9 +80,8 @@ case "$TREE" in
     WEIGHT_TREE="ntKp"
     MASS_AXIS_TITLE="m_{J/#psi K^{+}} [GeV/c^{2}]"
     DATA="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/Data_2024ppRef_Bu.root"
-    MC="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/MC_2024ppRef_Bu.root"
+    MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_MC.root"
     #DATA="./../../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_DATA.root"
-    #MC="./../../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_MC.root"
     CUTs="Bnorm_svpvDistance_2D > 4"
     ;;
   ntKstar)

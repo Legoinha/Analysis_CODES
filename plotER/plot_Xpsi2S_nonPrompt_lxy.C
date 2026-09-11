@@ -96,6 +96,12 @@ static TLine* DrawInclusiveBand(TH1D& hInclusive, Color_t color)
     return line;
 }
 
+TString mcSelection(TTree *tree, const TString &selection)
+{
+    if (!tree->GetBranch("pThatreweight")) return selection;
+    return Form("(%s) * pThatreweight", selection.Data());
+}
+
 void plot_Xpsi2S_nonPrompt_lxy(bool drawBinnedPoints = true)
 {
     gStyle->SetOptStat(0);
@@ -350,10 +356,14 @@ void plot_Xpsi2S_nonPrompt_lxy(bool drawBinnedPoints = true)
     TH1F hNonPromptPsi("hNonPromptPsi", ";l_{xy} [mm];Events", 75, -0.5, 2.5);
     TH1F hNonPromptX("hNonPromptX", ";l_{xy} [mm];Events", 75, -0.5, 2.5);
 
-    tPromptPsi->Draw(Form("%s >> hPromptPsi", lxyExpr.Data()), plotCut.Data(), "goff");
-    tPromptX->Draw(Form("%s >> hPromptX", lxyExpr.Data()), plotCut.Data(), "goff");
-    tNonPromptPsi->Draw(Form("%s >> hNonPromptPsi", lxyExpr.Data()), plotCut.Data(), "goff");
-    tNonPromptX->Draw(Form("%s >> hNonPromptX", lxyExpr.Data()), plotCut.Data(), "goff");
+    tPromptPsi->Draw(Form("%s >> hPromptPsi", lxyExpr.Data()),
+                     mcSelection(tPromptPsi, plotCut), "goff");
+    tPromptX->Draw(Form("%s >> hPromptX", lxyExpr.Data()),
+                   mcSelection(tPromptX, plotCut), "goff");
+    tNonPromptPsi->Draw(Form("%s >> hNonPromptPsi", lxyExpr.Data()),
+                        mcSelection(tNonPromptPsi, plotCut), "goff");
+    tNonPromptX->Draw(Form("%s >> hNonPromptX", lxyExpr.Data()),
+                      mcSelection(tNonPromptX, plotCut), "goff");
 
     hPromptPsi.Scale(1.0 / hPromptPsi.Integral());
     hPromptX.Scale(1.0 / hPromptX.Integral());
