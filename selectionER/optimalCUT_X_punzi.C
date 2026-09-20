@@ -55,8 +55,7 @@ double punziSmin(double backgroundYield, double a, double b)
            + b / 2.0 * TMath::Sqrt(b * b + 4.0 * a * sqrtB + 4.0 * backgroundYield);
 }
 
-double estimateBkgInSignalRegion(TTree* data, const TString& preCut, double threshold,
-                                  double& bkgLeftSideband, double& bkgRightSideband)
+double estimateBkgInSignalRegion(TTree* data, const TString& preCut, double threshold, double& bkgLeftSideband, double& bkgRightSideband)
 {
     const double mevToGeV = 0.001;
     const double mass = X3872_MASS;
@@ -71,10 +70,8 @@ double estimateBkgInSignalRegion(TTree* data, const TString& preCut, double thre
     const double signalWidth = 2.0 * signalHalfWidth;
     const double totalSidebandWidth = 2.0 * sidebandWidth;
 
-    const TString leftCut = Form("(%s) && (Prediction > %.3f) && (Bmass > %.6f && Bmass < %.6f)",
-                                 preCut.Data(), threshold, leftSidebandMin, leftSidebandMax);
-    const TString rightCut = Form("(%s) && (Prediction > %.3f) && (Bmass > %.6f && Bmass < %.6f)",
-                                  preCut.Data(), threshold, rightSidebandMin, rightSidebandMax);
+    const TString leftCut = Form("(%s) && (Prediction > %.3f) && (Bmass > %.6f && Bmass < %.6f)", preCut.Data(), threshold, leftSidebandMin, leftSidebandMax);
+    const TString rightCut = Form("(%s) && (Prediction > %.3f) && (Bmass > %.6f && Bmass < %.6f)", preCut.Data(), threshold, rightSidebandMin, rightSidebandMax);
 
     bkgLeftSideband = data->GetEntries(leftCut);
     bkgRightSideband = data->GetEntries(rightCut);
@@ -93,7 +90,7 @@ PunziResult optimizeBin(TTree* data, TTree* mcX, const TString& system,
 
     const double sxTotal = mcX->GetEntries(preCut);
     int ip = 0;
-    for (double thr = 0.; thr <= 1.0001; thr += 0.01) {
+    for (double thr = 0.; thr <= 1.0001; thr += 0.02) {
         const TString sel = Form("(%s) && (Prediction > %.3f)", preCut.Data(), thr);
         const double sx = mcX->GetEntries(sel);
         const double sigEff = (sxTotal > 0.) ? sx / sxTotal : 0.;
@@ -143,8 +140,7 @@ PunziResult optimizeBin(TTree* data, TTree* mcX, const TString& system,
     return result;
 }
 
-void writeSummaryTable(const TString& outDir, const TString& system,
-                       const std::vector<PunziResult>& results)
+void writeSummaryTable(const TString& outDir, const TString& system, const std::vector<PunziResult>& results)
 {
     std::ofstream out(Form("%s/punzi_summary_%s_Bpt.tex", outDir.Data(), system.Data()));
     out << std::fixed << std::setprecision(4);
@@ -174,12 +170,12 @@ void writeSummaryTable(const TString& outDir, const TString& system,
 // to run:
 // root -l -b -q 'optimalCUT_X_punzi.C("ppRef")'
 
-void optimalCUT_X_punzi(TString system = "ppRef", double a = 2.0, double b = 5.0)
+void optimalCUT_X_punzi(TString system = "PbPb23", double a = 2.0, double b = 5.0)
 {
     gStyle->SetOptStat(0);
 
-    TString dataPath = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/DATA_with_score.root";
-    TString mcXPath = "/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pp24_v3_fid2_4v1_xgb_v1/MC_with_score.root";
+    TString dataPath = "/eos/user/h/hmarques/Analysis_CODES/X_pb23_v27_fid18_9v9_rw0_xgb_v1/flat_ntmix_PbPb23_DATA.root";
+    TString mcXPath  = "/eos/user/h/hmarques/Analysis_CODES/X_pb23_v27_fid18_9v9_rw0_xgb_v1/flat_ntmix_PbPb23_MC_X3872.root";
     std::cout << "Reading " << system << " data sample: " << dataPath << std::endl;
     std::cout << "Reading prompt X(3872) MC sample: " << mcXPath << std::endl;
 
@@ -190,7 +186,9 @@ void optimalCUT_X_punzi(TString system = "ppRef", double a = 2.0, double b = 5.0
     fileX->GetObject("ntmix_X3872", mcX);
 
     std::vector<PunziBin> bins;
-    const TString baseCut = "BQvalue < 0.15";
+    TString baseCut = "" ;
+    if (system == "ppRef") { baseCut = "(Bpt > 7.5 && Bpt < 50) && BQvalue < 0.15";}
+    if (system == "PbPb23"){ baseCut = "(Bpt > 15  && Bpt < 50) && BQvalue < 0.15 && (abs(By) < 1.6) && Btrk2dR <= 0.35";}
 
     const double pMin = ptbinsvec_X.front();
     const double pMax = ptbinsvec_X.back();

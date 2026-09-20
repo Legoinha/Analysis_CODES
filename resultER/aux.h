@@ -1,7 +1,13 @@
 #ifndef RESULTER_AUX_H
 #define RESULTER_AUX_H
 
+#include "TBox.h"
+#include "TFile.h"
+#include "TH1D.h"
+#include "TNamed.h"
 #include "TString.h"
+#include <cmath>
+#include <stdexcept>
 
 static TString RatioAxisTitle(TString var)
 {
@@ -11,20 +17,44 @@ static TString RatioAxisTitle(TString var)
     return var;
 }
 
-#endif
-
-
-
-
-
-
-static TH1D* LoadHistFromFile(TString fileName, TString histName, TString cloneName)
+static TH1D* LoadHistFromFile(TString fileName, TString histName, TString cloneName,
+                              TString expectedMapCase = "",
+                              TString expectedWeightParticle = "",
+                              TString expectedWeightVariable = "")
 {
     TFile* f = TFile::Open(fileName, "READ");
-    TH1D* h = (TH1D*)f->Get(histName);
+    if (!f || f->IsZombie()) {
+        throw std::runtime_error(Form("[resultER] Cannot open %s", fileName.Data()));
+    }
+    TH1D* h = nullptr;
+    f->GetObject(histName, h);
+    if (!h) {
+        f->Close();
+        delete f;
+        throw std::runtime_error(Form("[resultER] Missing %s in %s", histName.Data(), fileName.Data()));
+    }
+    if (!expectedMapCase.IsNull()) {
+        TNamed* mapCase = nullptr;
+        TNamed* weightParticle = nullptr;
+        TNamed* weightVariable = nullptr;
+        f->GetObject("mapCase", mapCase);
+        f->GetObject("appliedWeightParticle", weightParticle);
+        f->GetObject("appliedWeightVariable", weightVariable);
+        if (!mapCase || expectedMapCase != mapCase->GetTitle() ||
+            !weightParticle || expectedWeightParticle != weightParticle->GetTitle() ||
+            !weightVariable || expectedWeightVariable != weightVariable->GetTitle()) {
+            f->Close();
+            delete f;
+            throw std::runtime_error(Form(
+                "[resultER] %s is not a %s/%s/%s corrected-yield artifact; rerun effER",
+                fileName.Data(), expectedMapCase.Data(), expectedWeightParticle.Data(),
+                expectedWeightVariable.Data()));
+        }
+    }
     TH1D* out = (TH1D*)h->Clone(cloneName);
     out->SetDirectory(nullptr);
     f->Close();
+    delete f;
     return out;
 }
 
@@ -32,7 +62,8 @@ static TH1D* LoadParticleTotalUnc(TString treename, TString system, TString var)
 {
     const TString path = Form("output_ntmix/systematicFILES/ntmix_totalUnc_%s_%s_%s.root", treename.Data(), system.Data(), var.Data());
     TFile f(path, "READ");
-    TH1D* h = (TH1D*)f.Get("hTotalUncPercent");
+    TH1D* h = nullptr;
+    f.GetObject("hTotalUncPercent", h);
     TH1D* out = (TH1D*)h->Clone(Form("hTotalUncPercent_%s_%s", treename.Data(), var.Data()));
     out->SetDirectory(nullptr);
     f.Close();
@@ -41,10 +72,15 @@ static TH1D* LoadParticleTotalUnc(TString treename, TString system, TString var)
 
 static TH1D* BuildNominalRatio(TString system, TString var)
 {
-    const TString numFile = Form("../effER/output/ROOTs/ntmix_X3872_%s_%s_%s_%s_CorrectedYields.root", system.Data(), var.Data(), "usePw", "splot");
-    const TString denFile = Form("../effER/output/ROOTs/ntmix_PSI2S_%s_%s_%s_%s_CorrectedYields.root", system.Data(), var.Data(), "usePw", "splot");
-    TH1D* hNum = LoadHistFromFile(numFile, "hYieldCorr", Form("hYieldCorr_X3872_%s", var.Data()));
-    TH1D* hDen = LoadHistFromFile(denFile, "hYieldCorr", Form("hYieldCorr_PSI2S_%s", var.Data()));
+    const TString numFile = Form("../effER/output/%s/ROOTs/ntmix_X3872_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
+    const TString denFile = Form("../effER/output/%s/ROOTs/ntmix_PSI2S_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
+    TH1D* hNum = LoadHistFromFile(numFile, "hYieldCorr",
+                                  Form("hYieldCorr_X3872_%s", var.Data()),
+                                  "raw", "X3872", "none");
+    TH1D* hDen = LoadHistFromFile(denFile, "hYieldCorr",
+                                  Form("hYieldCorr_PSI2S_%s", var.Data()),
+                                  "raw", "PSI2S", "none");
+
     TH1D* hRatio = (TH1D*)hNum->Clone(Form("hRatio_X3872_over_PSI2S_%s_%s", system.Data(), var.Data()));
     hRatio->SetDirectory(nullptr);
     hRatio->SetTitle(Form(";%s;X(3872) / #psi(2S)", RatioAxisTitle(var).Data()));
@@ -78,7 +114,7 @@ static TH1D* BuildRatioSystematic(TH1D* hRatio, TString system, TString var)
 
 
 
-static void StyleRatio(TH1D* hRatio, TH1D* hSyst = nullptr)
+static void StyleRatio(TH1D* hRatio, TString system = "ppRef", TH1D* hSyst = nullptr)
 {
     hRatio->SetLineColor(kBlack);
     hRatio->SetMarkerColor(kBlack);
@@ -87,7 +123,8 @@ static void StyleRatio(TH1D* hRatio, TH1D* hSyst = nullptr)
     hRatio->SetStats(0);
     hRatio->SetTitle("");
 
-    hRatio->GetYaxis()->SetRangeUser(0, 0.4);     //RANGES
+    const double yMaxRatio = system.Contains("PbPb") ? 7.5 : 0.4;   //RANGES
+    hRatio->GetYaxis()->SetRangeUser(0, yMaxRatio);
     hRatio->GetYaxis()->SetTitleOffset(2.0);
     hRatio->GetYaxis()->SetTitleSize(0.035);
     hRatio->GetYaxis()->SetLabelSize(0.035);
@@ -117,3 +154,5 @@ static void DrawSystBoxes(TH1D* hSyst, Color_t fillColor = kGray + 1, double alp
         box->Draw("same");
     }
 }
+
+#endif

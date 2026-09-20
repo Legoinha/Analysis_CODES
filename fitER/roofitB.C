@@ -9,19 +9,23 @@
 #include <TObjString.h>
 #include <TParameter.h>
 #include <stdio.h>
+#include <vector>
 
-#include "../plotER/aux/parameters.h"   //
+double minhisto = 0;
+double maxhisto = 999;
+double minhisto_B = 5.;
+double maxhisto_B = 5.8;
+int nbinsmasshisto = 40;
 
 void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString treeName, TString sample, TString system="ppRef", TString DOselCUTS="1");
-std::pair<int, std::vector<double>> defineBinning(const TString& var, const TString& tree, int full);
 
 // PDF VARIATION FOR SYST STUDIES
-int syst_study=0;
+int syst_study=1;
 
 // PROFILE LIKELIHOOD SIGNIFICANCE + INCLUSIVE SCAN
-int use_profile_likelihood = 0;
+int use_profile_likelihood = 1;
 
-void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef"){
+void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef", std::vector<double> VAR_BINS = {}){
 
 	//Setup the working area
 	TString RESULT_BASE = Form("results/%s", SYSTEM.Data());
@@ -37,9 +41,8 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	gSystem->mkdir(Form("%s", OUTPLOTF.Data()),true); 
 	
 	// BINING DEFINITION
-	int _nBins;
-	std::vector<double> _varBINS;
-	std::tie(_nBins, _varBINS) = defineBinning(VAR, TREE, FULL);
+	std::vector<double> _varBINS = VAR_BINS;
+	int _nBins = static_cast<int>(_varBINS.size()) - 1;
 
 	// PRINT WHAT IS ABOUT TO HAPPEN //
 	cout << endl << endl;
@@ -69,13 +72,16 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	RooRealVar* y     = new RooRealVar("By","By",-2.4, 2.4);
 	RooRealVar* nChargedTracks = new RooRealVar("nChargedTracks","nChargedTracks",0,2000000000);
 	RooRealVar* CentBin = new RooRealVar("CentBin","CentBin",0,100);
+	RooRealVar* pThatWeight = new RooRealVar("pThatreweight","pThatreweight",0,1.0e12);
 
 	RooWorkspace* ws = new RooWorkspace("ws");
+	RooWorkspace* wsMC = new RooWorkspace("ws_mc");
 	ws->import(*mass);
 	ws->import(*y);
 	ws->import(*pt);
 	ws->import(*nChargedTracks);
 	ws->import(*CentBin);
+	ws->import(*pThatWeight);
 
 	//DATA and MC SAMPLES
 	TString dataTree = TREE;
@@ -155,7 +161,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		////////// FITFITFITFITFITFITFITFITFITFITFITFIT //////////
 
 		cout << "Starting the fiting function for " << TREE.Data() << " " << VAR.Data() << " ["<< _varBINS[i] << ", " << _varBINS[i+1] << "]" << endl;
-		RooFitResult* f_results = fit(SYSTEM, "", "", TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, VAR.Data(), fitMassBins);
+		RooFitResult* f_results = fit(SYSTEM, "", "", TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, *wsMC, VAR.Data(), fitMassBins);
 		ws->saveSnapshot(Form("nominalPars_bin%d", _count), f_results->floatParsFinal(), true);
 
 		////////// FITFITFITFITFITFITFITFITFITFITFITFIT //////////
@@ -217,7 +223,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		TLatex* variationLabel = new TLatex(0.68, 0.35, "");
 		setupLABELS(variationLabel, 0.030, false);
 
-		if(TREE == "ntmix_X3872" && SYSTEM != "ppRef_nonPrompt"){		//SIGNIFICANCE
+		if(TREE == "ntmix_X3872" && !SYSTEM.Contains("nonPrompt")){		//SIGNIFICANCE
 			FitSignificanceResult signif = GetFitSignificanceForPlot(
 				ws, _count, mass, ith_DATA_bin, f_results,
 				use_profile_likelihood == 1, use_profile_likelihood == 1,
@@ -256,7 +262,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			//BACKGROUND MODEL SYSTEMATIC STUDY
 			for(int j=0; j < static_cast<int>(background.size()); j++)
 			{
-				RooFitResult* f_back = fit(SYSTEM, "background", background[j].code.c_str(), TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, VAR, fitMassBins);
+				RooFitResult* f_back = fit(SYSTEM, "background", background[j].code.c_str(), TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, *wsMC, VAR, fitMassBins);
 				RooRealVar* chi2_data_norm_back = ws->var(Form("chi2_data_norm%d_%s", _count, background[j].code.c_str()));
 				RooRealVar* fitYield_back = static_cast<RooRealVar*>(f_back->floatParsFinal().at(f_back->floatParsFinal().index(Form("nsig%d_%s",_count,background[j].code.c_str()))));
 				chi2_vec_back[j][i] = (chi2_data_norm_back ? chi2_data_norm_back->getVal() : -1.0);
@@ -285,7 +291,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			//SIGNAL MODEL SYSTEMATIC STUDY
 			for(int j=0; j< static_cast<int>(signal.size()); j++)
 			{
-				RooFitResult* f_signal = fit(SYSTEM, "signal", signal[j].code.c_str(), TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, VAR, fitMassBins);
+				RooFitResult* f_signal = fit(SYSTEM, "signal", signal[j].code.c_str(), TREE, c, cMC, ith_DATA_bin, ith_MC_bin, mass, _varBINS[i], _varBINS[i+1], *ws, *wsMC, VAR, fitMassBins);
 				RooRealVar* chi2_data_norm_sig = ws->var(Form("chi2_data_norm%d_%s", _count, signal[j].code.c_str()));
 				RooRealVar* fitYield_signal = static_cast<RooRealVar*>(f_signal->floatParsFinal().at(f_signal->floatParsFinal().index(Form("nsig%d_%s",_count,signal[j].code.c_str()))));
 					chi2_vec_sig[j][i] = (chi2_data_norm_sig ? chi2_data_norm_sig->getVal() : -1.0);
@@ -328,17 +334,43 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	//BIN ANALYSIS END
 	//BIN ANALYSIS END
 	
-	// Save fit workspace and metadata for later plotting
+	// FULL=1 writes the inclusive model used by validation.
+	// FULL=0 writes the analysis-bin model used by the Acc x Eff application.
 	TString fitFileName = FULL==1
 		? Form("%s/nominalFitModel_%s_%s.root", ROOT_BASE.Data(), TREE.Data(), SYSTEM.Data())
 		: Form("%s/fitResults_%s_%s_%s.root", ROOT_BASE.Data(), TREE.Data(), VAR.Data(), SYSTEM.Data());
 	TFile* nominalModelOut = new TFile(fitFileName, "recreate");
 	nominalModelOut->cd();
+	ws->RecursiveRemove(mc);
 	ws->Write("ws_nominal");
 	hPt->Write();
-	hPtMC->Write();
 	WriteFitMetadata(nominalModelOut, TREE, VAR, SYSTEM, CUT, _varBINS, minhisto, maxhisto, fitMassBins);
+	TObjString inputMCStr(INPUTMC);
+	inputMCStr.Write("inputMC");
+	TObjString inputDataStr(INPUTDATA);
+	inputDataStr.Write("inputData");
+	TObjString mcWeightStr((TREE == "ntmix_X3872" || TREE == "ntmix_PSI2S") ? "pThatreweight" : "none");
+	mcWeightStr.Write("mcWeight");
+	TObjString fitModeStr(FULL==1 ? "inclusive" : "binned");
+	fitModeStr.Write("fitMode");
+	TObjString fitRoleStr( FULL==1 ? "validation sPlot" : "Acc x Eff data correction");
+	fitRoleStr.Write("fitRole");
 	nominalModelOut->Close();
+
+	if (FULL==0) {
+		TFile* mcModelOut = new TFile( Form("%s/mcFitResults_%s_%s_%s.root", ROOT_BASE.Data(), TREE.Data(), VAR.Data(), SYSTEM.Data()), "recreate");
+		mcModelOut->cd();
+		wsMC->Write("ws_mc");
+		hPtMC->Write();
+		WriteFitMetadata(mcModelOut, TREE, VAR, SYSTEM, CUT, _varBINS, minhisto, maxhisto, fitMassBins);
+		inputMCStr.Write("inputMC");
+		mcWeightStr.Write("mcWeight");
+		TObjString mcFitModeStr("binnedMC");
+		mcFitModeStr.Write("fitMode");
+		TObjString mcFitRoleStr("Acc x Eff closure");
+		mcFitRoleStr.Write("fitRole");
+		mcModelOut->Close();
+	}
 
 	if (FULL==1) return;
 
@@ -810,43 +842,11 @@ void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString
 	RooArgList arg_list("arg_list");
 	arg_list.add(*(w.var("Bmass")));
 	for(auto lab : label){arg_list.add(*(w.var(lab)));}
-	RooDataSet* data_s = new RooDataSet(sample, sample, t1, arg_list);
+	if (sample == "mc" && (treeName == "ntmix_X3872" || treeName == "ntmix_PSI2S")) {
+		arg_list.add(*(w.var("pThatreweight")));
+	}
+	RooDataSet* data_s = sample == "mc" && (treeName == "ntmix_X3872" || treeName == "ntmix_PSI2S")
+		? new RooDataSet(sample, sample, t1, arg_list, "", "pThatreweight")
+		: new RooDataSet(sample, sample, t1, arg_list);
 	w.import(*data_s);
-}
-
-std::pair<int, std::vector<double>>
-defineBinning(const TString& var, const TString& tree, int full)
-{
-    // Number of bins
-    int nBins = 1;
-
-	if (var == "Bpt" && full == 0) {
-        if (tree == "ntmix_X3872" || tree == "ntmix_PSI2S") nBins = N_pt_Bins_X;
-        else                 nBins = N_pt_Bins_B;
-    } else if (var == "By")  {nBins = N_y_Bins_X;
-    } else if (var == "nChargedTracks"){nBins = N_mult_Bins_X;
-	} else if (var == "Cent" || var == "CentBin"){nBins = N_cent_Bins_X;}
-
-    std::vector<double> varBINS;
-    varBINS.resize(nBins + 1);
-
-    if(var=="Bpt"){
-        if(full == 1){
-            if(tree == "ntmix_X3872" || tree == "ntmix_PSI2S"){
-                varBINS[0] = ptbinsvec_X.front();
-                varBINS[1] = ptbinsvec_X.back();
-            }else{
-                varBINS[0] = ptbinsvec_B.front();
-                varBINS[1] = ptbinsvec_B.back();
-            }
-        }else{
-            if(tree=="ntmix_X3872" || tree == "ntmix_PSI2S"){for(int c = 0; c <= nBins; ++c){varBINS[c] = ptbinsvec_X[c];}} 
-			else{for(int c = 0; c <= nBins; ++c){varBINS[c] = ptbinsvec_B[c];}}
-        }
-    }
-	else if (var == "By")   {for(int c = 0; c <= nBins; ++c){varBINS[c] = ybinsvec[c];}}
-	else if (var == "nChargedTracks"){for(int c = 0; c <= nBins; ++c){varBINS[c] = nmbinsvec[c];}}
-	else if (var == "Cent" || var == "CentBin") {for(int c = 0; c <= nBins; ++c){varBINS[c] = centbinsvec[c];}}
-
-    return { nBins, varBINS };
 }

@@ -13,6 +13,9 @@
 *.err
 *.sub
 
+X_pb23_v19_fid13_9v9_rw0_xgb_v1/
+X_pb23_v7_fid5_9v4_rw0_xgb_v1/
+
 selectionER/.venv*/
 selectionER/.envs/
 selectionER/condor_logs/

@@ -46,91 +46,50 @@ void plot2D_dataMC(TString TREE = "ntmix_PSI2S", TString systemNAME = "ppRef", T
     TString mcLabel = "MC";
     const bool isNtmixSignal = (TREE == "ntmix_X3872" || TREE == "ntmix_PSI2S");
 
-    if (TREE == "ntmix_X3872") {
+    const TString sharingDir = "/eos/user/h/hmarques/RUN3_Data_MC_sharing";
+
+    if (isNtmixSignal) {
+        TString sampleDir;
+        TString sampleTag;
+        if (systemNAME == "ppRef" || systemNAME == "ppRef24") {
+            sampleDir = "ppRef24";
+            sampleTag = "ppRef";
+        } else if (systemNAME == "PbPb23" || systemNAME == "PbPb24") {
+            sampleDir = systemNAME;
+            sampleTag = systemNAME;
+        } else {
+            std::cerr << "[plot2D_dataMC] Unsupported X(3872)/Psi(2S) system: "
+                      << systemNAME << std::endl;
+            return;
+        }
+
+        const TString particleTag = TREE == "ntmix_X3872" ? "X3872" : "PSI2S";
+        const TString sampleBase = Form("%s/X3872/%s", sharingDir.Data(), sampleDir.Data());
         dataTree = "ntmix";
-        mcTree = "ntmix_X3872";
-        mcLabel = "X(3872) MC";
-        if (systemNAME == "ppRef") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root";
+        mcTree = TREE;
+        mcLabel = TREE == "ntmix_X3872" ? "X(3872) MC" : "#psi(2S) MC";
+        dataPath = Form("%s/flat_ntmix_%s_DATA.root", sampleBase.Data(), sampleTag.Data());
+        mcPath = Form("%s/flat_ntmix_%s_MC_%s.root",
+                      sampleBase.Data(), sampleTag.Data(), particleTag.Data());
+    } else if (TREE == "ntKp" || TREE == "ntKstar" || TREE == "ntphi") {
+        if (systemNAME != "ppRef" && systemNAME != "PbPb23" && systemNAME != "PbPb24") {
+            std::cerr << "[plot2D_dataMC] Unsupported B-meson system: " << systemNAME
+                      << ". Use ppRef, PbPb23, or PbPb24." << std::endl;
+            return;
         }
-        if (systemNAME == "PbPb23") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_X3872.root";
-        }
-        if (systemNAME == "PbPb24") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_MC_X3872.root";
-        }
-    }
 
-    if (TREE == "ntmix_PSI2S") {
-        dataTree = "ntmix";
-        mcTree = "ntmix_PSI2S";
-        mcLabel = "#psi(2S) MC";
-        if (systemNAME == "ppRef") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root";
-        }
-        if (systemNAME == "PbPb23") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_PSI2S.root";
-        }
-        if (systemNAME == "PbPb24") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb24/flat_ntmix_PbPb24_MC_PSI2S.root";
-        }
-    }
-
-    if (TREE == "ntphi") {
-        dataTree = "ntphi";
-        mcTree = "ntphi";
-        if (systemNAME == "ppRef") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntphi_ppRef_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntphi_ppRef_MC.root";
-        }
-        if (systemNAME == "PbPb23") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntphi_PbPb23_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntphi_PbPb23_MC.root";
-        }
-        if (systemNAME == "PbPb24") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntphi_PbPb24_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntphi_PbPb24_MC.root";
-        }
-    }
-
-    if (TREE == "ntKp") {
-        dataTree = "ntKp";
-        mcTree = "ntKp";
-        if (systemNAME == "ppRef") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_MC.root";
-        }
-        if (systemNAME == "PbPb23") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntKp_PbPb23_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntKp_PbPb23_MC.root";
-        }
-        if (systemNAME == "PbPb24") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntKp_PbPb24_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntKp_PbPb24_MC.root";
-        }
-    }
-
-    if (TREE == "ntKstar") {
-        dataTree = "ntKstar";
-        mcTree = "ntKstar";
-        if (systemNAME == "ppRef") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKstar_ppRef_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKstar_ppRef_MC.root";
-        }
-        if (systemNAME == "PbPb23") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntKstar_PbPb23_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_ntKstar_PbPb23_MC.root";
-        }
-        if (systemNAME == "PbPb24") {
-            dataPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntKstar_PbPb24_DATA.root";
-            mcPath = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_ntKstar_PbPb24_MC.root";
-        }
+        const TString sampleBase = Form("%s/Bmesons/%s", sharingDir.Data(), systemNAME.Data());
+        dataTree = TREE;
+        mcTree = TREE;
+        dataPath = Form("%s/flat_%s_%s_DATA.root",
+                        sampleBase.Data(), TREE.Data(), systemNAME.Data());
+        mcPath = Form("%s/flat_%s_%s_MC.root",
+                      sampleBase.Data(), TREE.Data(), systemNAME.Data());
+    } else {
+        std::cerr << "[plot2D_dataMC] Unsupported tree: " << TREE
+                  << ". Use ntmix_X3872, ntmix_PSI2S, ntKp, ntKstar, or ntphi."
+                  << std::endl;
+        return;
     }
 
     const TString outDir = Form("2Dplots/%s_%s", outTag.Data(), systemNAME.Data());
@@ -142,15 +101,39 @@ void plot2D_dataMC(TString TREE = "ntmix_PSI2S", TString systemNAME = "ppRef", T
     std::cout << "[plot2D_dataMC] DATA   = " << dataPath << " (" << dataTree << ")" << std::endl;
     std::cout << "[plot2D_dataMC] MC     = " << mcPath << " (" << mcTree << ")" << std::endl;
 
-    TFile* dataFile = TFile::Open(dataPath, "READ");
-    TFile* mcFile = TFile::Open(mcPath, "READ");
+    TFile* dataFile = TFile::Open(dataPath.Data(), "READ");
+    if (!dataFile || dataFile->IsZombie()) {
+        std::cerr << "[plot2D_dataMC] Cannot open DATA file: " << dataPath << std::endl;
+        if (dataFile) { dataFile->Close(); delete dataFile; }
+        return;
+    }
+
+    TFile* mcFile = TFile::Open(mcPath.Data(), "READ");
+    if (!mcFile || mcFile->IsZombie()) {
+        std::cerr << "[plot2D_dataMC] Cannot open MC file: " << mcPath << std::endl;
+        if (mcFile) { mcFile->Close(); delete mcFile; }
+        dataFile->Close();
+        delete dataFile;
+        return;
+    }
+
     TTree* treeData = nullptr;
     TTree* treeMC = nullptr;
-    dataFile->GetObject(dataTree, treeData);
-    mcFile->GetObject(mcTree, treeMC);
-
-    if (!dataFile || dataFile->IsZombie() || !mcFile || mcFile->IsZombie() || !treeData || !treeMC) {
-        std::cerr << "[plot2D_dataMC] Could not open input files or trees." << std::endl;
+    dataFile->GetObject(dataTree.Data(), treeData);
+    mcFile->GetObject(mcTree.Data(), treeMC);
+    if (!treeData || !treeMC) {
+        if (!treeData) {
+            std::cerr << "[plot2D_dataMC] Missing DATA tree " << dataTree
+                      << " in " << dataPath << std::endl;
+        }
+        if (!treeMC) {
+            std::cerr << "[plot2D_dataMC] Missing MC tree " << mcTree
+                      << " in " << mcPath << std::endl;
+        }
+        dataFile->Close();
+        mcFile->Close();
+        delete dataFile;
+        delete mcFile;
         return;
     }
 
@@ -270,6 +253,8 @@ void plot2D_dataMC(TString TREE = "ntmix_PSI2S", TString systemNAME = "ppRef", T
 
     dataFile->Close();
     mcFile->Close();
+    delete dataFile;
+    delete mcFile;
 }
 
 int main()

@@ -31,6 +31,14 @@ bash run_flat.sh ppRef MC ntmix _X3872 ""
 bash run_flat.sh ppRef MC ntmix _PSI2S _nonPrompt
 ```
 
+PbPb23 B-meson MC commands, run from `Analysis_CODES`:
+
+```bash
+bash flatER/run_flat.sh PbPb23 MC ntKp "" ""
+bash flatER/run_flat.sh PbPb23 MC ntphi "" ""
+bash flatER/run_flat.sh PbPb23 MC ntKstar "" ""
+```
+
 Matching rules:
 
 - `DATA`: only the filename keywords `DATA` and `SYSTEM` are used
@@ -79,23 +87,40 @@ every MC file against exactly one row and checks that all `pThat`/`phat` tokens 
 path agree with the table. Missing, ambiguous, duplicated, or non-physical entries
 stop the job instead of assigning a default weight.
 
-The current registry uses ppRef production-table cross sections/filter efficiencies
-and actual full-campaign input event counts for `n_gen`. Nominal requested counts
-must not be substituted for the count in the files being flattened. Campaigns that
-are not present on EOS are omitted until they can be counted. To enable Bs, B0,
-PbPb23, PbPb24, or another system later, add its rows to the same CSV; no change to
-the flattening logic is required. Data flattening neither reads this table nor
-creates the `pThatreweight` branch.
+The current registry uses ppRef and PbPb23 production-table cross sections/filter
+efficiencies and actual full-campaign input event counts for `n_gen`. Nominal
+requested counts must not be substituted for the count in the files being
+flattened. Campaigns that are not present on EOS are omitted until they can be
+counted. To enable PbPb24 or another system later, add its rows to the same CSV; no
+change to the flattening logic is required. Data flattening neither reads this table
+nor creates the `pThatreweight` branch.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Reweighting comparison plots
 
 After producing the final merged MC file, `run_flat.sh` automatically compares the
-reconstructed `Bpt` distribution before and after applying `pThatreweight`. The
-histograms are normalized to unit area. The style follows `plotER/plot_dataMC.C`:
-a blue hatched unweighted distribution and an orange reweighted line on a 600x600
-canvas.
+reconstructed `Bpt` distribution before and after applying `pThatreweight`. Both
+histograms are normalized to unit area and the y-axis is logarithmic. The style follows
+`plotER/plot_dataMC.C`: a blue hatched
+unweighted distribution and an orange reweighted line on a 600x600 canvas.
 
-Each comparison is saved as both PDF and ROOT files under:
+The comparison presentation is fixed; there is no plot-mode argument. The logarithmic
+y-axis range is fixed to 10^-5 through 10^-1 for direct comparison across samples.
+
+The Bpt comparison uses 100 bins from 0 to 55 GeV/c. Each comparison is saved only
+as a PDF under:
 
 ```text
 flatER/reweighting_comparisons/
@@ -103,14 +128,58 @@ flatER/reweighting_comparisons/
 └── Bmeson/   # B+, Bs, and B0 channels
 ```
 
-The ROOT output contains `unweighted`, `reweighted`, and `canvas`. Filenames include
-the system, particle/promptness, variable, and weight branch, so parallel jobs for
-different samples do not collide.
+Filenames include the system, particle/promptness, variable, and weight branch, so
+parallel jobs for different samples do not collide.
 
-`PlotReweightComparison.C` is intentionally generic. Future centrality or
-multiplicity comparisons can use the same function by passing their variable name,
-weight branch, and binning. Automatic runner production currently remains restricted
-to `Bpt` with `pThatreweight`.
+The plotting macro is standalone: if the flattened ROOT file already exists, no new
+flattening is needed. Run these commands from `Analysis_CODES`.
+
+### ppRef X(3872) and Psi(2S)
+
+```bash
+# Prompt Psi(2S)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root","ntmix_PSI2S","ntmix","ppRef","_PSI2S","","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Nonprompt Psi(2S)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S_nonPrompt.root","ntmix_PSI2S","ntmix","ppRef","_PSI2S","_nonPrompt","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Prompt X(3872)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root","ntmix_X3872","ntmix","ppRef","_X3872","","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Nonprompt X(3872)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872_nonPrompt.root","ntmix_X3872","ntmix","ppRef","_X3872","_nonPrompt","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+```
+
+### PbPb23 X(3872) and Psi(2S)
+
+```bash
+# Prompt Psi(2S)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_PSI2S.root","ntmix_PSI2S","ntmix","PbPb23","_PSI2S","","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Nonprompt Psi(2S)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_PSI2S_nonPrompt.root","ntmix_PSI2S","ntmix","PbPb23","_PSI2S","_nonPrompt","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Prompt X(3872)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_X3872.root","ntmix_X3872","ntmix","PbPb23","_X3872","","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+
+# Nonprompt X(3872)
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_X3872_nonPrompt.root","ntmix_X3872","ntmix","PbPb23","_X3872","_nonPrompt","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+```
+
+### ppRef B mesons
+
+```bash
+# B+
+root -l -b -q 'flatER/PlotReweightComparison.C("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_MC.root","ntKp","ntKp","ppRef","","","flatER/reweighting_comparisons","Bpt","pThatreweight",100)'
+```
+
+The current ppRef `ntKstar` (B0) and `ntphi` (Bs) flat files do not contain the
+`pThatreweight` branch, so the comparison cannot run on them yet. Add their commands
+after weighted flat outputs become available.
+
+Future centrality or multiplicity comparisons can use the same function by passing
+their variable and weight branch. Automatic runner production currently remains
+restricted to `Bpt` with `pThatreweight`.
 
 For example, with:
 

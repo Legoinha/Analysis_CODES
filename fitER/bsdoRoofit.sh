@@ -9,7 +9,8 @@ MC_Bs="/eos/user/c/ctorresc/BmesonsHIN/PreXGBFiles/MC_2024ppRef_Bs.root"
 #Data and MC Samples
 
 ## NEW CUTS ? here 
-CUTs="Bnorm_svpvDistance_2D > 4"
+CUTs="Bnorm_svpvDistance_2D > 4 && Bpt > 7.5"
+
 
 ##
 syst="ppRef"
@@ -18,7 +19,7 @@ mkdir -p ROOTfiles/
 
 #The Function to be called:
 #
-#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef"){
+#void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef", std::vector<double> VAR_BINS = {}){
 
 
 if [ $DOANALYSISPbPb_FULL_BS  -eq 1  ]; then
@@ -28,7 +29,8 @@ root -b -q "roofitB.C++(\"ntphi\", \
                       \"$MC_Bs\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"$syst\")"
+                      \"$syst\", \
+                      std::vector<double>{7.5,60})"
 fi
 
 if [ $DOANALYSISPbPb_BINNED_PT_BS  -eq 1  ]; then
@@ -38,7 +40,8 @@ root -b -q "roofitB.C++(\"ntphi\",\
                       \"$MC_Bs\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"$syst\")"
+                      \"$syst\", \
+                      std::vector<double>{7.5,10,15,20,30,60})"
 fi
 
 rm roofitB_C.d roofitB_C_ACLiC_dict_rdict.pcm roofitB_C.so

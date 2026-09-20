@@ -1,7 +1,7 @@
 DOANALYSISPbPb_FULL_PSI=1
-DOANALYSISPbPb_BINNED_PT_PSI=0
+DOANALYSISPbPb_BINNED_PT_PSI=1
 DOANALYSISPbPb_BINNED_Y_PSI=0
-DOANALYSISPbPb_BINNED_MULT_PSI=0
+DOANALYSISPbPb_BINNED_MULT_PSI=1
 
 ##
 syst="ppRef"
@@ -13,40 +13,43 @@ MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_
 DATA="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root"
 
 ## SELECTION CUTs go here
-CUTs_INC="Btrk1dR < 0.5 && Btrk2dR < 0.5 && BQvalue < 0.15"
-CUTs="((Bpt > 7.5  && Bpt < 12.5 && Prediction > 0.24) || (Bpt > 12.5 && Bpt < 17.5 && Prediction > 0.38) || (Bpt > 17.5 && Bpt < 22.5 && Prediction > 0.44) || (Bpt > 22.5 && Bpt < 50 && Prediction > 0.10)) && BQvalue < 0.15  "
-#CUTs=" BQvalue < 0.2 && Btrk1dR < .45 && Btrk2dR < .45"
+CUTs_INC="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt > 7.5  && Bpt < 50)"
+#CUTs="((Bpt > 7.5  && Bpt < 12.5 && Prediction > 0.24) || (Bpt > 12.5 && Bpt < 17.5 && Prediction > 0.38) || (Bpt > 17.5 && Bpt < 22.5 && Prediction > 0.44) || (Bpt > 22.5 && Bpt < 50 && Prediction > 0.10)) && BQvalue < 0.15  "
+CUTs="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt > 7.5  && Bpt < 50)"
+
 
 mkdir -p ROOTfiles/
 
 if [ $DOANALYSISPbPb_FULL_PSI -eq 1 ]; then
-root -b -q "roofitB.C++(\"ntmix_PSI2S\", \
+root -b -q "roofitB.C(\"ntmix_PSI2S\", \
                       1, \
                       \"$DATA\", \
                       \"$MC\", \
-                      \"Bpt\", \
+                      \"Bpt\", \ 
                       \"$CUTs_INC\", \
-                      \"$syst\")"
+                      \"$syst\", \
+                      std::vector<double>{7.5,50})"
 fi
 
 if [ $DOANALYSISPbPb_BINNED_PT_PSI -eq 1 ]; then
-root -b -q "roofitB.C++(\"ntmix_PSI2S\",\
+root -b -q "roofitB.C(\"ntmix_PSI2S\",\
                       0, \
                       \"$DATA\", \
                       \"$MC\", \
                       \"Bpt\", \
                       \"$CUTs\", \
-                      \"$syst\")"
+                      \"$syst\", \
+                      std::vector<double>{7.5,12.5,17.5,22.5,50})"
 fi
 
 if [ $DOANALYSISPbPb_BINNED_MULT_PSI -eq 1 ]; then
-root -b -q "roofitB.C++(\"ntmix_PSI2S\",\
+root -b -q "roofitB.C(\"ntmix_PSI2S\",\
                       0, \
                       \"$DATA\", \
                       \"$MC\", \
                       \"nChargedTracks\", \
                       \"$CUTs\", \
-                      \"$syst\")"
+                      \"$syst\", \
+                      std::vector<double>{0,15,30,50,100})"
 fi
 
-rm roofitB_C.d roofitB_C_ACLiC_dict_rdict.pcm roofitB_C.so

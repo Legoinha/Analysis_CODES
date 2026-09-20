@@ -31,7 +31,19 @@ struct ReweightInput {
     TH1D* hist = nullptr;
 };
 
-static constexpr int kNBins = 15;
+static constexpr int kNBins = 10;
+
+static TString normalizeWeightTag(TString tag)
+{
+    tag = tag.Strip(TString::kBoth);
+    if (tag.BeginsWith("hWeight_")) tag.Remove(0, TString("hWeight_").Length());
+    return tag;
+}
+
+static TString validationWeightExpression(const VarCfgSignal& var)
+{
+    return var.absVal ? Form("abs(%s)", var.expr.Data()) : var.expr;
+}
 
 static double lookupWeight1D(const TH1D* hist, double value)
 {
@@ -41,28 +53,26 @@ static double lookupWeight1D(const TH1D* hist, double value)
 }
 
 
-static std::vector<VarCfgSignal> getSignalVars(TString treeName)
+static std::vector<VarCfgSignal> getSignalVars(TString treeName, TString systemTag = "")
 {
     std::vector<VarCfgSignal> vars = {
-        {"PVnchi2", ";PVnchi2;", kNBins, 0.0, 1.0, false},
-        {"nChargedTracks", ";nChargedTracks;", kNBins, 0.0, 200.0, false},
-        {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 50.0, false},
-        {"By", ";|y|;", kNBins, 0.0, 2.4, true},
-        {"Prediction", ";Prediction;", kNBins, 0.55, 1.0, false},
+        {"Bpt", ";p_{T} [GeV/c];", kNBins, 10, 50.0, false},
+        {"By", ";|y|;", kNBins, 0.0, 1.6, true},
+        {"Score", ";Score;", kNBins, 0.8, 1.0, false},
         {"Bchi2Prob", ";Bchi2Prob;", kNBins, 0.0, 1.0, false},
-        {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, .5, false},
-        {"Btrk2dR", ";Btrk2dR;", kNBins, 0.0, .5, false},
+        {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, .3, false},
+        {"Btrk2dR", ";Btrk2dR;", kNBins, 0.0, .3, false},
         {"BtrkPtimb", ";BtrkPtimb;", kNBins, 0.0, 1.0, false},
-        {"Btktkpt", ";Btktkpt;", kNBins, 0.0, 10.0, false},
-        {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.3, false},
+        {"Btktkpt", ";Btktkpt;", kNBins, 0.0, 35.0, false},
+        {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.95, 3.25, false},
         {"BujvProb", ";BujvProb;", kNBins, 0.0, 1.0, false},
-        {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 15.0, false},
-        {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.25, false},
+        {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 35.0, false},
+        {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.05, false},
         {"BsvpvDisErr_2D", ";BsvpvDisErr_2D;", kNBins, 0.0, 0.025, false},
-        {"BQvalue", ";BQvalue;", kNBins, 0.0, 0.6, false},
+        {"BQvalue", ";BQvalue;", kNBins, 0.0, 0.3, false},
         {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -5.0, 5.0, false},
         {"Bnorm_trk2Dxy", ";Bnorm_trk2Dxy;", kNBins, -5.0, 5.0, false},
-        {"Balpha", ";Balpha;", kNBins, 0.0, 3.2, false},
+        {"Balpha", ";Balpha;", kNBins, 0.0, 3.0, false},
         {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, -1.0, 1.0, false},
         {"Btktkmass", ";Btktkmass;", kNBins, 0.0, 2.0, false},
         {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 5.0, false},
@@ -104,63 +114,28 @@ static std::vector<VarCfgSignal> getSignalVars(TString treeName)
         {"Bnorm_trk2Dz", ";Bnorm_trk2Dz;", kNBins, -5.0, 5.0, false}
     };
 
-    if (treeName == "ntphi") {
+    if (treeName == "ntKp") {
         vars = {
-            {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 50.0, false},
+            {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 60.0, false},
             {"By", ";|y|;", kNBins, 0.0, 2.4, true},
-            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 0.5, false},
-            {"Btrk2dR", ";Btrk2dR;", kNBins, 0.0, 0.5, false},
-            {"BtrkPtimb", ";BtrkPtimb;", kNBins, 0.0, 1.0, false},
-            {"Btktkpt", ";Btktkpt;", kNBins, 0.0, 10.0, false},
+            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 2, false},
+            {"Btrk1Dz1", ";Btrk1Dz1;", kNBins, -0.5, 0.5, false},
+            {"Bnorm_trk1Dz", ";Bnorm_trk1Dz;", kNBins, -5.0, 5.0, false},
+            {"Bmu1phi", ";Bmu1phi;", kNBins, -3.2, 3.2, false},
+            {"Btrk1Eta", ";Btrk1Eta;", kNBins, -2.4, 2.4, false},
+            {"Btrk1Phi", ";Btrk1Phi;", kNBins, -3.2, 3.2, false},
+            {"Bmu1pt", ";Bmu1pt;", kNBins, 0.0, 25.0, false},
             {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.3, false},
-            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 15.0, false},
-            {"BQvalue", ";BQvalue;", kNBins, 0.0, 0.6, false},
-            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -5.0, 5.0, false},
-            {"Bnorm_trk2Dxy", ";Bnorm_trk2Dxy;", kNBins, -5.0, 5.0, false},
-            {"Balpha", ";Balpha;", kNBins, 0.0, 3.2, false},
-            {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, -1.0, 1.0, false},
-            {"Btktkmass", ";Btktkmass;", kNBins, 0.0, 2.0, false},
-            {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 5.0, false},
-            {"Btrk2Pt", ";Btrk2Pt;", kNBins, 0.0, 5.0, false}
-        };
-    } else if (treeName == "ntKp") {
-        vars = {
-            {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 50.0, false},
-            {"By", ";|y|;", kNBins, 0.0, 2.4, true},
-            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 1.5, false},
-            {"BtrkPtimb", ";BtrkPtimb;", kNBins, 0.0, 1.0, false},
-            {"Btktkpt", ";Btktkpt;", kNBins, 0.0, 10.0, false},
-            {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.3, false},
-            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 15.0, false},
-            {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.25, false},
-            {"BQvalue", ";BQvalue;", kNBins, 0.0, 0.6, false},
-            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -5.0, 5.0, false},
-            {"Balpha", ";Balpha;", kNBins, 0.0, 3.2, false},
-            {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, -1.0, 1.0, false},
-            {"Btktkmass", ";Btktkmass;", kNBins, 0.0, 2.0, false},
+            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 40.0, false},
+            {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.40, false},
+            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -10.0, 10.0, false},
+            {"Balpha", ";Balpha;", kNBins, 0.0, 1.0, false},
+            {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, 0.995, 1.0, false},
             {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 10.0, false},
-            {"BtktkvProb", ";BtktkvProb;", kNBins, 0.0, 1.0, false}
-        };
-    } else if (treeName == "ntKstar") {
-        vars = {
-            {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 50.0, false},
-            {"By", ";|y|;", kNBins, 0.0, 2.4, true},
-            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 0.5, false},
-            {"Btrk2dR", ";Btrk2dR;", kNBins, 0.0, 0.5, false},
-            {"BtrkPtimb", ";BtrkPtimb;", kNBins, 0.0, 1.0, false},
-            {"Btktkpt", ";Btktkpt;", kNBins, 0.0, 10.0, false},
-            {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.3, false},
-            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 15.0, false},
-            {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.25, false},
-            {"BQvalue", ";BQvalue;", kNBins, 0.0, 0.6, false},
-            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -5.0, 5.0, false},
-            {"Bnorm_trk2Dxy", ";Bnorm_trk2Dxy;", kNBins, -5.0, 5.0, false},
-            {"Balpha", ";Balpha;", kNBins, 0.0, 3.2, false},
-            {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, -1.0, 1.0, false},
-            {"Btktkmass", ";Btktkmass;", kNBins, 0.0, 2.0, false},
-            {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 5.0, false},
-            {"Btrk2Pt", ";Btrk2Pt;", kNBins, 0.0, 5.0, false},
-            {"BtktkvProb", ";BtktkvProb;", kNBins, 0.0, 1.0, false}
+            {"Bujpt", ";Bujpt;", kNBins, 0.0, 50.0, false},
+            {"Bujeta", ";Bujeta;", kNBins, -2.4, 2.4, false},
+            {"Bujphi", ";Bujphi;", kNBins, -3.2, 3.2, false},
+            {"Bujlxy", ";Bujlxy;", kNBins, -0.1, 0.1, false}
         };
     }
 
@@ -172,10 +147,28 @@ static std::vector<VarCfgSignal> getSignalVars(TString treeName)
             }
             if (v.expr == "Bmass") { v.xmin = 3.6; v.xmax = 4.0; }
         }
+
     } else if (treeName == "ntmix_PSI2S") {
         for (auto& v : vars) {
-            if (v.expr == "Btktkmass") { v.xmin = 0.4; v.xmax = 0.65; }
+            if (v.expr == "Btktkmass") { v.xmin = 0.42; v.xmax = 0.61; }
             if (v.expr == "Bmass") { v.xmin = 3.6; v.xmax = 4.0; }
+        }
+    }
+
+    if (systemTag.BeginsWith("PbPb")) {
+        for (auto& v : vars) {
+            if (v.expr == "Bpt") {
+                v.xmin = 15.0;
+                v.xmax = 50.0;
+            }
+            if (v.expr == "By") {
+                v.xmin = 0.0;
+                v.xmax = 1.6;
+            }
+            if (v.expr == "Score") {
+                v.xmin = 0.85;
+                v.xmax = 1.0;
+            }
         }
     }
     return vars;

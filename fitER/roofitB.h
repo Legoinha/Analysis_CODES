@@ -8,7 +8,7 @@ using namespace RooFit;
 using namespace std;
 
 Int_t _count=0;
-RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, TCanvas* c, TCanvas* cMC, RooDataSet* ds, RooDataSet* dsMC, RooRealVar* mass, float binmin, float binmax, RooWorkspace& w, TString which_var, int NBIN){
+RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, TCanvas* c, TCanvas* cMC, RooDataSet* ds, RooDataSet* dsMC, RooRealVar* mass, float binmin, float binmax, RooWorkspace& w, RooWorkspace& wMC, TString which_var, int NBIN){
 	double init_mean = Bs_MASS;
 	if (tree == "ntKp") init_mean = Bu_MASS;
 	else if (tree == "ntKstar") init_mean = Bd_MASS;
@@ -16,7 +16,7 @@ RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, 
 	else if (tree == "ntmix_PSI2S") init_mean = PSI2S_MASS;
 	
 	double init_sigma1 = 0.01, init_sigma2 = 0.005, min_sigma1 = 0.001, max_sigma1 = 0.1, min_sigma2 = 0.001, max_sigma2 = 0.1;
-	if (system == "ppRef_nonPrompt") { init_sigma1 = 0.01; init_sigma2 = 0.005; min_sigma1 = 0.005; max_sigma1 = 0.1; min_sigma2 = 0.004; max_sigma2 = 0.01; }	
+	if (system.Contains("nonPrompt")) { init_sigma1 = 0.01; init_sigma2 = 0.005; min_sigma1 = 0.005; max_sigma1 = 0.1; min_sigma2 = 0.004; max_sigma2 = 0.01; }
 
 	RooRealVar mean(Form("mean%d_%s", _count, pdf.Data()), "", init_mean, init_mean - 0.01, init_mean + 0.01);
 	RooRealVar sigma1(Form("sigma1%d_%s", _count, pdf.Data()), "", init_sigma1, min_sigma1, max_sigma1);
@@ -52,7 +52,14 @@ RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, 
 	else if (tree == "ntmix_X3872") mass->setRange("signal", init_mean - 0.035, init_mean + 0.035);
 	else if (tree == "ntmix_PSI2S") mass->setRange("signal", init_mean - 0.03, init_mean + 0.03);
 
-	RooFitResult* fitResultMC = modelMC->fitTo(*dsMC, Save(), Extended(), Range("signal"));
+	RooFitResult* fitResultMC = modelMC->fitTo(*dsMC, Save(), Extended(), Range("signal"), SumW2Error(true));
+	if (variation == "" && pdf == "") {
+		wMC.import(*dsMC);
+		wMC.import(*modelMC, RecycleConflictNodes());
+		RooArgSet* mcFitParameters = wMC.pdf(Form("modelMC%d_", _count))->getParameters(*wMC.data(Form("mc%d", _count)));
+		wMC.saveSnapshot(Form("mcFitPars_bin%d", _count), *mcFitParameters, true);
+		delete mcFitParameters;
+	}
 	w.import(*nsigMC);
 
 	cMC->Clear();
@@ -135,7 +142,9 @@ RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, 
 	RooRealVar lambda(Form("lambda%d_%s", _count, pdf.Data()), "lambda", -0.5, -5., 0.1);
 	RooExponential bkg(Form("bkg%d_%s", _count, pdf.Data()), "", *mass, lambda);
 
-	RooRealVar nbkg_part_r(Form("nbkg_part_r%d_%s", _count, pdf.Data()), "", 6000, 250, 1e4);
+	const double nbkgPartInit = std::max(1.0, 0.05 * ds->sumEntries());
+	RooRealVar nbkg_part_r(Form("nbkg_part_r%d_%s", _count, pdf.Data()), "",
+						 nbkgPartInit, 0.0, ds->sumEntries());
 	RooRealVar* m_nonprompt_scale = new RooRealVar(Form("m_nonprompt_scale%d_%s", _count, ""), "m_nonprompt_scale", 0.01, 0.001, 0.1);
 	RooRealVar* m_nonprompt_shift = new RooRealVar(Form("m_nonprompt_shift%d_%s", _count, ""), "m_nonprompt_shift", 5.15, 5.1, 5.2);
 	RooGenericPdf* erfc = new RooGenericPdf(Form("erfc%d", _count), "0.5*TMath::Erfc((@0-@2)/@1)", RooArgList(*mass, *m_nonprompt_scale, *m_nonprompt_shift));

@@ -42,3 +42,19 @@ ppRef,ntKp,bplus,inclusive,10,Bplus_to_JPsiK_pthat10/,1.797e9,1.000e-2,504578
 ppRef,ntKp,bplus,inclusive,15,Bplus_to_JPsiK_pthat15/,4.412e8,1.300e-2,471548
 ppRef,ntKp,bplus,inclusive,30,Bplus_to_JPsiK_pthat30/,3.218e7,1.800e-2,512704
 ppRef,ntKp,bplus,inclusive,50,Bplus_to_JPsiK_pthat50/,3.908e6,2.300e-2,523004
+# PbPb23 official B-meson productions; n_gen counted from Bfinder/ntGen.
+PbPb23,ntKp,bplus,inclusive,5,Bplus_to_JPsiK_pthat5_Bfinder_pbpb23,1.598e10,3.000e-3,465791
+PbPb23,ntKp,bplus,inclusive,10,Bplus_to_JPsiK_pthat10_Bfinder_pbpb23,1.809e9,8.500e-3,550096
+PbPb23,ntKp,bplus,inclusive,15,Bplus_to_JPsiK_pthat15_Bfinder_pbpb23,4.407e8,1.500e-2,488292
+PbPb23,ntKp,bplus,inclusive,30,Bplus_to_JPsiK_pthat30_Bfinder_pbpb23,3.191e7,2.200e-2,509689
+PbPb23,ntKp,bplus,inclusive,50,Bplus_to_JPsiK_pthat50_Bfinder_pbpb23,3.924e6,2.400e-2,512702
+PbPb23,ntphi,bs,inclusive,5,Bs_to_JPsiPhi_pthat5_Bfinder_pbpb23,1.582e10,8.700e-4,484047
+PbPb23,ntphi,bs,inclusive,10,Bs_to_JPsiPhi_pthat10_Bfinder_pbpb23,1.809e9,2.100e-3,537468
+PbPb23,ntphi,bs,inclusive,15,Bs_to_JPsiPhi_pthat15_Bfinder_pbpb23,4.414e8,4.600e-3,497302
+PbPb23,ntphi,bs,inclusive,30,Bs_to_JPsiPhi_pthat30_Bfinder_pbpb23,3.235e7,3.300e-3,504039
+PbPb23,ntphi,bs,inclusive,50,Bs_to_JPsiPhi_pthat50_Bfinder_pbpb23,3.906e6,6.800e-3,494761
+PbPb23,ntKstar,bzero,inclusive,5,B0_to_JPsiKStar_pthat5_Bfinder_pbpb23,1.597e10,8.300e-3,451570
+PbPb23,ntKstar,bzero,inclusive,10,B0_to_JPsiKStar_pthat10_Bfinder_pbpb23,1.804e9,1.800e-2,486638
+PbPb23,ntKstar,bzero,inclusive,15,B0_to_JPsiKStar_pthat15_Bfinder_pbpb23,4.436e8,1.790e-2,493514
+PbPb23,ntKstar,bzero,inclusive,30,B0_to_JPsiKStar_pthat30_Bfinder_pbpb23,3.230e7,2.920e-2,476728
+PbPb23,ntKstar,bzero,inclusive,50,B0_to_JPsiKStar_pthat50_Bfinder_pbpb23,3.894e6,3.300e-2,524140

@@ -8,6 +8,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+def normalize_tree_name(tree_name):
+    aliases = {
+        "ntmix": "X3872",
+        "ntmix_X3872": "X3872",
+        "ntmix_PSI2S": "Psi2S",
+    }
+    return aliases.get(tree_name, tree_name)
+
+
 def get_particle_label(tree_name):
     particle_labels = {
         "X3872": "X(3872)",
@@ -20,6 +29,7 @@ def get_particle_label(tree_name):
     
 
 def resolve_paths(tree_name, system_name):
+    tree_name = normalize_tree_name(tree_name)
     base_dir = "/eos/user/h/hmarques/Analysis_CODES"
     x3872_sample_dir = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872"
 
@@ -51,33 +61,58 @@ def resolve_paths(tree_name, system_name):
     return path_to_data, path_to_mc, data_tree, mc_tree
 
 
+def weighted_corrcoef(values, weights):
+    values = np.asarray(values, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    valid = np.all(np.isfinite(values), axis=1) & np.isfinite(weights) & (weights > 0.0)
+    values = values[valid]
+    weights = weights[valid]
+
+    if values.shape[0] < 2 or not np.sum(weights) > 0.0:
+        raise RuntimeError("Not enough finite, positive-weight MC entries for a correlation matrix")
+
+    mean = np.average(values, axis=0, weights=weights)
+    centered = values - mean
+    covariance = (centered * weights[:, None]).T @ centered / np.sum(weights)
+    sigma = np.sqrt(np.diag(covariance))
+    denominator = np.outer(sigma, sigma)
+    correlation = np.divide(
+        covariance,
+        denominator,
+        out=np.full_like(covariance, np.nan),
+        where=denominator > 0.0,
+    )
+    np.fill_diagonal(correlation, 1.0)
+    return correlation, valid
+
+
 def plot_correlation_dataMC(tree="X3872", system_name="ppRef"):
     ROOT.gROOT.SetBatch(True)
+    tree = normalize_tree_name(tree)
 
     variables = [
-        "Btrk1Pt",
-        "Btrk1dR",
-        "Btrk2dR",
-        "BtrkPtimb",
-        "BtktkvProb",
         "Bchi2Prob",
         "Bmass",
         "BQvalue",
         "Bpt",
         "Bnorm_svpvDistance_2D",
         "Balpha",
-        "Bnorm_trk1Dxy",
-        "Bnorm_trk1Dz",
-        "Btktkpt",
-        "BujvProb",
+        "Btrk1Pt",
         "Btrk1Eta",
         "Btrk1Phi",
+        "Bnorm_trk1Dxy",
+        "Bnorm_trk1Dz",
+        "BtrkPtimb",
+        "Btrk1dR",
+        "Btktkpt",
+        "BtktkvProb",
         "Bmu1pt",
         "Bmu1eta",
         "Bmu1phi",
         "Bujpt",
         "Bujeta",
         "Bujphi",
+        "BujvProb"
     ]
 
     path_to_data, path_to_mc, data_tree_name, mc_tree_name = resolve_paths(tree, system_name)
@@ -92,8 +127,18 @@ def plot_correlation_dataMC(tree="X3872", system_name="ppRef"):
     data_cut = f"({selection}) && ({sideband})"
     data_file = ROOT.TFile.Open(path_to_data)
     mc_file = ROOT.TFile.Open(path_to_mc)
+    if not data_file or data_file.IsZombie():
+        raise RuntimeError(f"Cannot open DATA file: {path_to_data}")
+    if not mc_file or mc_file.IsZombie():
+        raise RuntimeError(f"Cannot open MC file: {path_to_mc}")
     data_tree = data_file.Get(data_tree_name)
     mc_tree = mc_file.Get(mc_tree_name)
+    if not data_tree:
+        raise RuntimeError(f"Cannot find DATA tree '{data_tree_name}' in {path_to_data}")
+    if not mc_tree:
+        raise RuntimeError(f"Cannot find MC tree '{mc_tree_name}' in {path_to_mc}")
+    if not mc_tree.GetBranch("pThatreweight"):
+        raise RuntimeError(f"MC tree '{mc_tree_name}' has no pThatreweight branch")
 
     common_vars = []
     for var in variables:
@@ -128,12 +173,19 @@ def plot_correlation_dataMC(tree="X3872", system_name="ppRef"):
     )
 
     rdf_mc = ROOT.RDataFrame(mc_tree_name, path_to_mc).Filter(selection)
-    arr_mc = rdf_mc.AsNumpy(common_vars)
+    arr_mc = rdf_mc.AsNumpy(common_vars + ["pThatreweight"])
     n_mc = len(arr_mc[common_vars[0]])
     print("n_data:", n_data)
     print("n_mc:", n_mc)
     mat_mc = np.column_stack([np.asarray(arr_mc[var], dtype=float) for var in common_vars])
-    corr_mc = np.corrcoef(mat_mc, rowvar=False)
+    mc_weights = np.asarray(arr_mc["pThatreweight"], dtype=float)
+    corr_mc, valid_mc = weighted_corrcoef(mat_mc, mc_weights)
+    print(
+        "MC weight: pThatreweight; range:",
+        f"[{mc_weights[valid_mc].min():.12g}, {mc_weights[valid_mc].max():.12g}]",
+        "; sum:",
+        f"{mc_weights[valid_mc].sum():.12g}",
+    )
     draw_matrix(
         corr_mc,
         common_vars,
@@ -174,5 +226,6 @@ if __name__ == "__main__":
 
 
 ## python3 correlation_dataMC.py X3872 ppRef
+## python3 correlation_dataMC.py ntmix ppRef
 ## python3 correlation_dataMC.py Psi2S ppRef
 ## python3 correlation_dataMC.py ntphi ppRef

@@ -17,13 +17,12 @@
 #include "../fitER/aux/uti.h"
 #include "aux.h"
 
-// Nominal ratio only: sPlot corrected yields with the PSI2S-weighted ACCxEFF map.
+// Nominal ratio: sPlot corrected yields with each particle's own raw ACCxEFF map.
 // Total systematic boxes are read from ntmix_UNCpropagator.C outputs.
 // root -l -b -q 'Ratio_CorrectedYields.C()'
 // root -l -b -q 'Ratio_CorrectedYields.C("ppRef","Bpt")'
 // root -l -b -q 'Ratio_CorrectedYields.C("ppRef","nChargedTracks")'
-
-static const TString kPromptFractionFile = "../plotER/nonPrompt_STUDY_lxy/nonprompt_lxy_fraction_Bpt.root";
+// root -l -b -q 'Ratio_CorrectedYields.C("PbPb23","Bpt",true)'   // pT-inclusive prompt fractions
 
 
 
@@ -33,26 +32,30 @@ struct PromptFractionHists {
     TH1D* hBenrichedNonPromptMC = nullptr;
 };
 
-static PromptFractionHists LoadPromptFractions(TString treename, TString system, TString var)
+static PromptFractionHists LoadPromptFractions(TString treename, TString system, TString var, bool inclusiveOnly)
 {
 
-    // FOR X3872 consider inclusive case; FOR PSI2S consider binned case
     const bool isX3872 = (treename == "ntmix_X3872");
+    const bool isMultiplicity = (var == "nChargedTracks" || var == "nMult");
+
     const TString tag = isX3872 ? "X3872" : "PSI2S";
     const TString storedTag = isX3872 ? "X3872" : "Psi2S";
-    const TString fractionBinning = isX3872 ? "inclusive" : "Bpt";
-    const TString fracPrefix = (treename == "ntmix_X3872") ? "hX3872_nonprompt_lxy" : "hPsi2S_nonprompt_lxy";
+    // Which block of the plotER nonprompt file to read. "inclusive" is the single
+    // pT-integrated point, broadcast later over every bin of the ratio.
+    const TString fractionBinning = inclusiveOnly ? "inclusive" : (isMultiplicity ? "nChargedTracks" : "Bpt");
+    const TString fractionFile = Form("../plotER/nonPrompt_STUDY_lxy/%s/nonprompt_fraction%s.root",
+                                      system.Data(), inclusiveOnly ? "_inclusive" : "");
+    const TString fracPrefix = isX3872 ? "hX3872_nonprompt_lxy" : "hPsi2S_nonprompt_lxy";
 
-    TH1D* hFracMC = LoadHistFromFile( kPromptFractionFile,
-        fracPrefix + "_fraction_" + fractionBinning,
+    TH1D* hFracMC = LoadHistFromFile(
+        fractionFile, fracPrefix + "_fraction_" + fractionBinning,
         Form("hBenrichedNonPromptMCFraction_%s_%s", tag.Data(), fractionBinning.Data()));
     TH1D* hNonPromptData = LoadHistFromFile(
-        kPromptFractionFile,
-        Form("h%s_dataDriven_nonprompt_fraction_%s", storedTag.Data(), fractionBinning.Data()),
+        fractionFile, Form("h%s_dataDriven_nonprompt_fraction_%s", storedTag.Data(), fractionBinning.Data()),
         Form("hNonPromptFractionFromBenriched_%s_%s", tag.Data(), fractionBinning.Data()));
-    TH1D* hPrompt = (TH1D*)hNonPromptData->Clone( Form("hPromptFraction_%s_%s", tag.Data(), fractionBinning.Data()));
+    TH1D* hPrompt = (TH1D*)hNonPromptData->Clone(Form("hPromptFraction_%s_%s", tag.Data(), fractionBinning.Data()));
 
-        hPrompt->SetDirectory(nullptr);
+    hPrompt->SetDirectory(nullptr);
     hPrompt->SetTitle(Form(";%s;f_{prompt}^{%s}", RatioAxisTitle(var).Data(), tag.Data()));
     hNonPromptData->SetTitle(Form(";%s;1 - f_{prompt}^{%s}", RatioAxisTitle(var).Data(), tag.Data()));
     hFracMC->SetTitle(Form(";%s;f_{B-enr}^{nonprompt, %s}", RatioAxisTitle(var).Data(), tag.Data()));
@@ -70,29 +73,6 @@ static PromptFractionHists LoadPromptFractions(TString treename, TString system,
     }
 
     return {hPrompt, hNonPromptData, hFracMC};
-}
-
-static TH1D* BuildPromptScaleFactor(PromptFractionHists& xPrompt, PromptFractionHists& psiPrompt, TString system, TString var)
-{
-    if (xPrompt.hPrompt->GetNbinsX() != 1) {
-        throw std::runtime_error("The X(3872) prompt fraction must be the inclusive one-bin result.");
-    }
-
-    TH1D* hScale = (TH1D*)psiPrompt.hPrompt->Clone(Form("hPromptRatioScaleFactor_%s_%s", system.Data(), var.Data()));
-    hScale->SetDirectory(nullptr);
-    hScale->Reset("ICES");
-    hScale->SetTitle(Form(";%s;f_{prompt}^{X(3872)} / f_{prompt}^{#psi(2S)}", RatioAxisTitle(var).Data()));
-
-    for (int i = 1; i <= hScale->GetNbinsX(); ++i) {
-        const double fx = xPrompt.hPrompt->GetBinContent(1);
-        const double fps = psiPrompt.hPrompt->GetBinContent(i);
-        if (fx <= 0.0 || fps <= 0.0) continue;
-        const double scale = fx / fps;
-        const double rel2 = std::pow(xPrompt.hPrompt->GetBinError(1) / fx, 2) + std::pow(psiPrompt.hPrompt->GetBinError(i) / fps, 2);
-        hScale->SetBinContent(i, scale);
-        hScale->SetBinError(i, scale * std::sqrt(rel2));
-    }
-    return hScale;
 }
 
 static TH1D* BuildPromptCorrectedRatio(TH1D* hInclusiveRatio, TH1D* hPromptScale, TString system, TString var)
@@ -115,6 +95,80 @@ static TH1D* BuildPromptCorrectedRatio(TH1D* hInclusiveRatio, TH1D* hPromptScale
     return hPromptRatio;
 }
 
+// hBinning fixes the output binning (always the corrected-yield ratio). Either
+// fraction may carry a single bin -- the pT-inclusive case -- and is then
+// broadcast over every bin; a fraction that is binned must match hBinning.
+static TH1D* BuildFractionScaleFactor(TH1D* hBinning, TH1D* hXFraction, TH1D* hPsiFraction,
+                                      TString name, TString title, TString var)
+{
+    TH1D* hScale = (TH1D*)hBinning->Clone(name);
+    hScale->SetDirectory(nullptr);
+    hScale->Reset("ICES");
+    hScale->SetTitle(Form(";%s;%s", RatioAxisTitle(var).Data(), title.Data()));
+
+    const bool broadcastX = (hXFraction->GetNbinsX() == 1);
+    const bool broadcastPsi = (hPsiFraction->GetNbinsX() == 1);
+    if (!broadcastX && hXFraction->GetNbinsX() != hScale->GetNbinsX()) {
+        throw std::runtime_error("[Ratio_CorrectedYields] X(3872) fraction binning differs from the ratio binning");
+    }
+    if (!broadcastPsi && hPsiFraction->GetNbinsX() != hScale->GetNbinsX()) {
+        throw std::runtime_error("[Ratio_CorrectedYields] psi(2S) fraction binning differs from the ratio binning");
+    }
+
+    for (int i = 1; i <= hScale->GetNbinsX(); ++i) {
+        const int xBin = broadcastX ? 1 : i;
+        const int psiBin = broadcastPsi ? 1 : i;
+        if ((!broadcastX &&
+             (std::abs(hXFraction->GetXaxis()->GetBinLowEdge(xBin) - hScale->GetXaxis()->GetBinLowEdge(i)) > 1.e-9 ||
+              std::abs(hXFraction->GetXaxis()->GetBinUpEdge(xBin) - hScale->GetXaxis()->GetBinUpEdge(i)) > 1.e-9)) ||
+            (!broadcastPsi &&
+             (std::abs(hPsiFraction->GetXaxis()->GetBinLowEdge(psiBin) - hScale->GetXaxis()->GetBinLowEdge(i)) > 1.e-9 ||
+              std::abs(hPsiFraction->GetXaxis()->GetBinUpEdge(psiBin) - hScale->GetXaxis()->GetBinUpEdge(i)) > 1.e-9))) {
+            throw std::runtime_error("[Ratio_CorrectedYields] fraction and ratio bin edges differ");
+        }
+        const double fx = hXFraction->GetBinContent(xBin);
+        const double fps = hPsiFraction->GetBinContent(psiBin);
+        if (fx <= 0.0 || fps <= 0.0) continue;
+        const double scale = fx / fps;
+        const double rel2 = std::pow(hXFraction->GetBinError(xBin) / fx, 2) + std::pow(hPsiFraction->GetBinError(psiBin) / fps, 2);
+        hScale->SetBinContent(i, scale);
+        hScale->SetBinError(i, scale * std::sqrt(rel2));
+    }
+    return hScale;
+}
+
+static TH1D* BuildComponentCorrectedRatio(TH1D* hInclusiveRatio, TH1D* hScale, TString name, TString title, TString var)
+{
+    TH1D* hComponentRatio = (TH1D*)hInclusiveRatio->Clone(name);
+    hComponentRatio->SetDirectory(nullptr);
+    hComponentRatio->SetTitle(Form(";%s;%s", RatioAxisTitle(var).Data(), title.Data()));
+    hComponentRatio->Reset("ICES");
+
+    for (int i = 1; i <= hComponentRatio->GetNbinsX(); ++i) {
+        const double rincl = hInclusiveRatio->GetBinContent(i);
+        const double scale = hScale->GetBinContent(i);
+        if (rincl <= 0.0 || scale <= 0.0) continue;
+        const double rcomponent = rincl * scale;
+        const double rel2 = std::pow(hInclusiveRatio->GetBinError(i) / rincl, 2) + std::pow(hScale->GetBinError(i) / scale, 2);
+        hComponentRatio->SetBinContent(i, rcomponent);
+        hComponentRatio->SetBinError(i, rcomponent * std::sqrt(rel2));
+    }
+    return hComponentRatio;
+}
+
+static void PrintRatioTable(const TString& label, TH1D* hRatio, TH1D* hRatioSyst,
+                            const TString& statLabel = "stat")
+{
+    std::cout << "[Ratio_CorrectedYields] " << label << std::endl;
+    for (int i = 1; i <= hRatio->GetNbinsX(); ++i) {
+        std::cout << "  bin " << i << " [" << hRatio->GetXaxis()->GetBinLowEdge(i)
+                  << "," << hRatio->GetXaxis()->GetBinUpEdge(i) << "] = "
+                  << hRatio->GetBinContent(i) << " +- " << hRatio->GetBinError(i)
+                  << " (" << statLabel << ") +- " << hRatioSyst->GetBinError(i)
+                  << " (inclusive syst)" << std::endl;
+    }
+}
+
 
 
 static void SaveNominalRatio(TH1D* hRatio, TH1D* hRatioSyst, TString outStem, TString system, std::vector<TH1D*> extraHists = std::vector<TH1D*>())
@@ -132,7 +186,7 @@ static void SaveNominalRatio(TH1D* hRatio, TH1D* hRatioSyst, TString outStem, TS
     pad->Draw();
     pad->cd();
 
-    StyleRatio(hRatio, hRatioSyst);
+    StyleRatio(hRatio, system, hRatioSyst);
     hRatio->Draw("AXIS");
     DrawSystBoxes(hRatioSyst);
     hRatio->Draw("E1 SAME");
@@ -152,9 +206,80 @@ static void SaveNominalRatio(TH1D* hRatio, TH1D* hRatioSyst, TString outStem, TS
     delete c;
 }
 
+static void SaveComponentRatios(TH1D* hPromptRatio, TH1D* hPromptRatioSyst,
+                                TH1D* hNonPromptRatio, TH1D* hNonPromptRatioSyst,
+                                TString outStem, TString system,
+                                std::vector<TH1D*> extraHists = std::vector<TH1D*>())
+{
+    TCanvas* c = new TCanvas(Form("c_%s", outStem.Data()), "component ratios", 700, 700);
+    c->cd();
+    TPad* pad = new TPad(Form("p_%s", outStem.Data()), Form("p_%s", outStem.Data()), 0., 0., 1., 1.);
+    pad->SetBorderMode(1);
+    pad->SetFrameBorderMode(0);
+    pad->SetBorderSize(2);
+    pad->SetTopMargin(0.08);
+    pad->SetBottomMargin(0.16);
+    pad->SetLeftMargin(0.14);
+    pad->SetRightMargin(0.04);
+    pad->Draw();
+    pad->cd();
+
+    TH1D* hFrame = (TH1D*)hPromptRatio->Clone(Form("hFrame_%s", outStem.Data()));
+    hFrame->SetDirectory(nullptr);
+    hFrame->Reset("ICES");
+    hFrame->SetTitle(Form(";%s;X(3872) / #psi(2S)", hPromptRatio->GetXaxis()->GetTitle()));
+    StyleRatio(hFrame, system);
+    hFrame->Draw("AXIS");
+
+    DrawSystBoxes(hPromptRatioSyst, kGray + 1, 0.25, kGray + 2);
+    DrawSystBoxes(hNonPromptRatioSyst, kAzure - 9, 0.22, kAzure - 6);
+
+    hPromptRatio->SetLineColor(kBlack);
+    hPromptRatio->SetMarkerColor(kBlack);
+    hPromptRatio->SetMarkerStyle(20);
+    hPromptRatio->SetLineWidth(2);
+    hNonPromptRatio->SetLineColor(kAzure + 2);
+    hNonPromptRatio->SetMarkerColor(kAzure + 2);
+    hNonPromptRatio->SetMarkerStyle(24);
+    hNonPromptRatio->SetLineWidth(2);
+
+    hPromptRatio->Draw("E1 SAME");
+    hNonPromptRatio->Draw("E1 SAME");
+    hFrame->Draw("AXIS SAME");
+
+    TLegend* leg = new TLegend(0.50, 0.70, 0.88, 0.88);
+    leg->SetBorderSize(0);
+    leg->SetFillStyle(0);
+    leg->SetTextSize(0.035);
+    leg->SetTextFont(42);
+    leg->AddEntry(hPromptRatio, "Prompt component", "lep");
+    leg->AddEntry(hNonPromptRatio, "Nonprompt component", "lep");
+    leg->Draw();
+
+    pad->RedrawAxis();
+    c->cd();
+    DrawCmsHeader(c, system);
+    c->Update();
+    c->SaveAs(Form("output_ntmix/%s.pdf", outStem.Data()));
+
+    TFile* fout = new TFile(Form("output_ntmix/root_files/%s.root", outStem.Data()), "RECREATE");
+    hPromptRatio->Write("hPromptRatio");
+    hPromptRatioSyst->Write("hPromptRatioSyst");
+    hNonPromptRatio->Write("hNonPromptRatio");
+    hNonPromptRatioSyst->Write("hNonPromptRatioSyst");
+    for (TH1D* h : extraHists) if (h) h->Write();
+    fout->Close();
+
+    delete leg;
+    delete hFrame;
+    delete pad;
+    delete c;
+}
+
 static void SaveRun1Comparison(TH1D* hNominal, TH1D* hNominalSyst, TString system, TString var)
 {
-    if (!hNominal || var != "Bpt") return;
+    // Run1 CMS is a pp measurement: only overlay it on a pp result.
+    if (!hNominal || var != "Bpt" || system != "ppRef") return;
 
     // https://www.hepdata.net/record/ins1219950?version=1&table=Table%201
     double run1Bins[] = {10.0, 13.5, 15.0, 18.0, 30.0, 50.0};
@@ -177,7 +302,7 @@ static void SaveRun1Comparison(TH1D* hNominal, TH1D* hNominalSyst, TString syste
     hFrame->SetDirectory(nullptr);
     hFrame->Reset("ICES");
     hFrame->SetTitle(Form(";%s;X(3872) / #psi(2S)", RatioAxisTitle(var).Data()));
-    StyleRatio(hFrame);
+    StyleRatio(hFrame, system);
 
     TCanvas* c = new TCanvas(Form("c_comparison_RUN1_%s_%s", system.Data(), var.Data()), "comparison_RUN1", 700, 700);
     c->cd();
@@ -252,7 +377,8 @@ static void SaveRun1Comparison(TH1D* hNominal, TH1D* hNominalSyst, TString syste
 
 static void SaveAtlasPromptComparison(TH1D* hPromptRatio, TH1D* hPromptRatioSyst, TString system, TString var)
 {
-    if (!hPromptRatio || !hPromptRatioSyst || var != "Bpt") return;
+    // ATLAS pp at 8 TeV: only overlay it on a pp result.
+    if (!hPromptRatio || !hPromptRatioSyst || var != "Bpt" || system != "ppRef") return;
 
     // https://www.hepdata.net/record/ins1495026?version=1&table=Table%204
     constexpr int nAtlas = 5;
@@ -272,7 +398,7 @@ static void SaveAtlasPromptComparison(TH1D* hPromptRatio, TH1D* hPromptRatioSyst
 
     TH1D* hFrame = new TH1D( Form("hAtlasPromptComparisonFrame_%s_%s", system.Data(), var.Data()), ";p_{T} [GeV];Prompt X(3872) / #psi(2S)", 1, 7.5, 70.0);
     hFrame->SetDirectory(nullptr);
-    StyleRatio(hFrame);
+    StyleRatio(hFrame, system);
     hFrame->GetXaxis()->SetTitle("p_{T} [GeV]");
     hFrame->GetYaxis()->SetTitle("Prompt X(3872) / #psi(2S)");
 
@@ -353,17 +479,23 @@ static void SaveAtlasPromptComparison(TH1D* hPromptRatio, TH1D* hPromptRatioSyst
 
 
 
+// PROMPTINCLUSIVE = true reads the pT-inclusive prompt/nonprompt fractions
+// (plotER nonprompt run with inclusiveOnly) and broadcasts them over the ratio
+// bins. That is the mode to use while the binned nonprompt fits do not converge.
 void Ratio_CorrectedYields(
     TString SYSTEM = "ppRef",
-    TString VAR = "Bpt"
-) {
+    TString VAR = "Bpt",
+    bool PROMPTINCLUSIVE = false
+ ) {
+    if (VAR == "nMult") VAR = "nChargedTracks";
     gSystem->mkdir("output_ntmix", true);
     gSystem->mkdir("output_ntmix/root_files", true);
     gStyle->SetOptStat(0);
 
     std::cout << "[Ratio_CorrectedYields] Nominal X(3872)/#psi(2S), system = " << SYSTEM
               << ", variable = " << VAR
-              << ", correction = sPlot + usePw map" << std::endl;
+              << ", prompt fractions = " << (PROMPTINCLUSIVE ? "pT-inclusive" : VAR.Data())
+              << ", correction = sPlot + particle-specific raw map" << std::endl;
 
     TH1D* hRatio = BuildNominalRatio(SYSTEM, VAR);
     TH1D* hRatioSyst = BuildRatioSystematic(hRatio, SYSTEM, VAR);
@@ -371,18 +503,16 @@ void Ratio_CorrectedYields(
     SaveNominalRatio(hRatio, hRatioSyst, outStem, SYSTEM);
     SaveRun1Comparison(hRatio, hRatioSyst, SYSTEM, VAR);
 
-    std::cout << "[Ratio_CorrectedYields] Inclusive ratio" << std::endl;
-    for (int i = 1; i <= hRatio->GetNbinsX(); ++i) {
-        std::cout << "  bin " << i << " [" << hRatio->GetXaxis()->GetBinLowEdge(i)
-                  << "," << hRatio->GetXaxis()->GetBinUpEdge(i) << "] = "
-                  << hRatio->GetBinContent(i) << " +- " << hRatio->GetBinError(i)
-                  << " (stat) +- " << hRatioSyst->GetBinError(i) << " (syst)" << std::endl;
-    }
+    PrintRatioTable("Inclusive ratio", hRatio, hRatioSyst, "stat");
 
-    if (VAR == "Bpt") {
-        PromptFractionHists xPrompt = LoadPromptFractions("ntmix_X3872", SYSTEM, VAR);
-        PromptFractionHists psiPrompt = LoadPromptFractions("ntmix_PSI2S", SYSTEM, VAR);
-        TH1D* hPromptScale = BuildPromptScaleFactor(xPrompt, psiPrompt, SYSTEM, VAR);
+    if (VAR == "Bpt" || VAR == "nChargedTracks" || VAR == "nMult") {
+        PromptFractionHists xPrompt = LoadPromptFractions("ntmix_X3872", SYSTEM, VAR, PROMPTINCLUSIVE);
+        PromptFractionHists psiPrompt = LoadPromptFractions("ntmix_PSI2S", SYSTEM, VAR, PROMPTINCLUSIVE);
+
+        TH1D* hPromptScale = BuildFractionScaleFactor(
+            hRatio, xPrompt.hPrompt, psiPrompt.hPrompt,
+            Form("hPromptRatioScaleFactor_%s_%s", SYSTEM.Data(), VAR.Data()),
+            "f_{prompt}^{X(3872)} / f_{prompt}^{#psi(2S)}", VAR);
         TH1D* hPromptRatio = BuildPromptCorrectedRatio(hRatio, hPromptScale, SYSTEM, VAR);
         TH1D* hPromptRatioSyst = BuildRatioSystematic(hPromptRatio, SYSTEM, VAR);
         const TString promptStem = Form("ntmix_X3872_OVER_ntmix_PSI2S_%s_%s_prompt_Ratio", SYSTEM.Data(), VAR.Data());
@@ -391,15 +521,33 @@ void Ratio_CorrectedYields(
                           psiPrompt.hPrompt, psiPrompt.hNonPromptFromData, psiPrompt.hBenrichedNonPromptMC,
                           hPromptScale});
         SaveAtlasPromptComparison(hPromptRatio, hPromptRatioSyst, SYSTEM, VAR);
+        PrintRatioTable("Prompt ratio = inclusive ratio * f_prompt(X) / f_prompt(psi2S)",
+                        hPromptRatio, hPromptRatioSyst, "stat + prompt-fraction stat");
 
-        std::cout << "[Ratio_CorrectedYields] Prompt ratio = inclusive ratio * f_prompt(X) / f_prompt(psi2S)" << std::endl;
-        for (int i = 1; i <= hPromptRatio->GetNbinsX(); ++i) {
-            std::cout << "  bin " << i << " [" << hPromptRatio->GetXaxis()->GetBinLowEdge(i)
-                      << "," << hPromptRatio->GetXaxis()->GetBinUpEdge(i) << "] = "
-                      << hPromptRatio->GetBinContent(i) << " +- " << hPromptRatio->GetBinError(i)
-                      << " (stat + prompt-fraction stat) +- " << hPromptRatioSyst->GetBinError(i)
-                      << " (inclusive syst)" << std::endl;
-        }
+        TH1D* hNonPromptScale = BuildFractionScaleFactor(
+            hRatio, xPrompt.hNonPromptFromData, psiPrompt.hNonPromptFromData,
+            Form("hNonPromptRatioScaleFactor_%s_%s", SYSTEM.Data(), VAR.Data()),
+            "f_{nonprompt}^{X(3872)} / f_{nonprompt}^{#psi(2S)}", VAR);
+        TH1D* hNonPromptRatio = BuildComponentCorrectedRatio(
+            hRatio, hNonPromptScale,
+            Form("hNonPromptRatio_X3872_over_PSI2S_%s_%s", SYSTEM.Data(), VAR.Data()),
+            "Nonprompt X(3872) / #psi(2S)", VAR);
+        TH1D* hNonPromptRatioSyst = BuildRatioSystematic(hNonPromptRatio, SYSTEM, VAR);
+        const TString nonPromptStem = Form("ntmix_X3872_OVER_ntmix_PSI2S_%s_%s_nonprompt_Ratio", SYSTEM.Data(), VAR.Data());
+        SaveNominalRatio(hNonPromptRatio, hNonPromptRatioSyst, nonPromptStem, SYSTEM,
+                         {xPrompt.hPrompt, xPrompt.hNonPromptFromData, xPrompt.hBenrichedNonPromptMC,
+                          psiPrompt.hPrompt, psiPrompt.hNonPromptFromData, psiPrompt.hBenrichedNonPromptMC,
+                          hNonPromptScale});
+        PrintRatioTable("Nonprompt ratio = inclusive ratio * f_nonprompt(X) / f_nonprompt(psi2S) (standalone, no previous-measurement comparison)",
+                        hNonPromptRatio, hNonPromptRatioSyst, "stat + nonprompt-fraction stat");
+
+        const TString componentsStem = Form("ntmix_X3872_OVER_ntmix_PSI2S_%s_%s_components_Ratio", SYSTEM.Data(), VAR.Data());
+        SaveComponentRatios(hPromptRatio, hPromptRatioSyst,
+                            hNonPromptRatio, hNonPromptRatioSyst,
+                            componentsStem, SYSTEM,
+                            {xPrompt.hPrompt, xPrompt.hNonPromptFromData, xPrompt.hBenrichedNonPromptMC,
+                             psiPrompt.hPrompt, psiPrompt.hNonPromptFromData, psiPrompt.hBenrichedNonPromptMC,
+                             hPromptScale, hNonPromptScale});
 
         delete xPrompt.hPrompt;
         delete xPrompt.hNonPromptFromData;
@@ -410,6 +558,9 @@ void Ratio_CorrectedYields(
         delete hPromptScale;
         delete hPromptRatio;
         delete hPromptRatioSyst;
+        delete hNonPromptScale;
+        delete hNonPromptRatio;
+        delete hNonPromptRatioSyst;
     }
 
     delete hRatio;
@@ -420,7 +571,8 @@ void Ratio_CorrectedYields(
     TString treenameN,
     TString treenameD,
     TString SYSTEM,
-    TString VAR
+    TString VAR,
+    bool PROMPTINCLUSIVE = false
 ) {
-    Ratio_CorrectedYields(SYSTEM, VAR);
+    Ratio_CorrectedYields(SYSTEM, VAR, PROMPTINCLUSIVE);
 }

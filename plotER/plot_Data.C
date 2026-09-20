@@ -14,25 +14,39 @@
 #include "aux/parameters.h"
 #include "aux/masses.h"
 
-void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
+void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb23"){
     gStyle->SetOptStat(0);
 
     // Create a TChain and add all files from the directory
     TChain chain(Form("%s", TREE.Data()));
 
-    if(systemNAME.Contains("PbPb23")){        //PbPb23 data
-        chain.Add("./../../RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
-    } else if(systemNAME.Contains("PbPb24")) {//PbPb24 data
-        chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_24b_PbPb_AANN.root");
-    }else if (systemNAME.Contains("PbPb")){
-        chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_PbPb_AANN.root");
-        chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_24_PbPb_AANN.root");
-    }else { //ppRef data
-        //if (TREE == "ntmix"){       chain.Add("/eos/user/k/kprince/X3872_pp_new/DATA_pp_VAANN.root");}
-        //if (TREE == "ntmix"){       chain.Add("/eos/user/k/kprince/X3872_pp_new/DATA_pp_AANN.root");}
-        //if (TREE == "ntmix"){     chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/ML_xgboost/scored_samples/flat_ntmix_ppRef_scored_DATA.root");}
+    if (systemNAME.Contains("PbPb23")) { // PbPb23 data
+        if (TREE == "ntmix") {
+            //chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
+            chain.Add("/eos/user/h/hmarques/Analysis_CODES/X_pb23_v27_fid18_9v9_rw0_xgb_v1/flat_ntmix_PbPb23_DATA.root");
+        } else {
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_%s_PbPb23_DATA.root", TREE.Data()));
+        }
+    } else if (systemNAME.Contains("PbPb24")) { // PbPb24 data
+        if (TREE == "ntmix") {
+            chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_24b_PbPb_AANN.root");
+        } else {
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_%s_PbPb24_DATA.root", TREE.Data()));
+        }
+    } else if (systemNAME.Contains("PbPb")) {
+        if (TREE == "ntmix") {
+            chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_PbPb_AANN.root");
+            chain.Add("/eos/user/k/kprince/X3872_PbPb/DATA_24_PbPb_AANN.root");
+        } else {
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_%s_PbPb23_DATA.root", TREE.Data()));
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb24/flat_%s_PbPb24_DATA.root", TREE.Data()));
+        }
+    } else { // ppRef data
+        //if (TREE == "ntmix"){   chain.Add("/eos/user/k/kprince/X3872_pp_new/DATA_pp_VAANN.root");}
+        //if (TREE == "ntmix"){   chain.Add("/eos/user/k/kprince/X3872_pp_new/DATA_pp_AANN.root");}
+        //if (TREE == "ntmix"){   chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/ML_xgboost/scored_samples/flat_ntmix_ppRef_scored_DATA.root");}
         if (TREE == "ntmix"){     chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root");}
-        //if (TREE == "ntmix"){     chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/OLD_ppRef_OLD/flat_ntmix_ppRef_DATA.root");}
+        //if (TREE == "ntmix"){   chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/OLD_ppRef_OLD/flat_ntmix_ppRef_DATA.root");}
         else if (TREE == "ntKp") {  chain.Add("./../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_DATA.root");}
         else if (TREE == "ntphi"){  chain.Add("./../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntphi_ppRef_DATA.root");}
         else if (TREE == "ntKstar"){chain.Add("./../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKstar_ppRef_DATA.root");}
@@ -44,36 +58,36 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
 
     // Define histogram parameters
     double hist_Xlow = 5;     // Minimum Bmass
-    double hist_Xhigh = 5.8;  // Maximum Bmass
+    double hist_Xhigh = 6;  // Maximum Bmass
     if (TREE == "ntmix"){hist_Xlow = 3.6; hist_Xhigh = 4.0;}
-    int nbinsmasshisto = 80;    
+    int nbinsmasshisto = 40;    
     double bin_length_MEV = (hist_Xhigh - hist_Xlow)*1000 / nbinsmasshisto;
 
     TString SELECTIONcuts = "1";
 
     if (TREE == "ntmix") {
         if (systemNAME.Contains("PbPb23")) {
-            SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50)";
+            SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && (BQvalue < 0.15) && Btrk2dR <= 0.35 && Prediction > 0.9";
             //SELECTIONcuts = "abs(By) < 1.4 && Bpt > 10 && BQvalue < 0.15 && CentBin > 20 && Btrk1dR < .25 && Btrk2dR < .25 && BtrkPtimb > 0.15";
         } else if (systemNAME.Contains("PbPb24")){
-            SELECTIONcuts = "abs(By) < 1.6 & Bpt > 10 & Prediction > 0.91 & BQvalue < 0.2 ";
+            SELECTIONcuts = "abs(By) < 1.6 & Bpt > 10 & Score > 0.91 & BQvalue < 0.2 ";
 
         } else if (systemNAME.Contains("PbPb")) {
             //SELECTIONcuts = "abs(By) < 1.2 && Bpt > 10 && BQvalue < 0.15 && CentBin > 20 && Btrk1dR < .25 && Btrk2dR < .25 && BtrkPtimb > 0.15";  // sample already has cuts applied
-            SELECTIONcuts = "  abs(By) < 1.6 & Bpt > 10 & BQvalue < 0.25  & Prediction > 0.88";  
+            SELECTIONcuts = "  abs(By) < 1.6 & Bpt > 10 & BQvalue < 0.25  & Score > 0.88";  
         } else {
             //SELECTIONcuts = "(((Bpt > 7.5  && Bpt < 12.5) && Prediction > 0.65) || "
             //                "((Bpt > 12.5 && Bpt < 17.5) && Prediction > 0.87)  || "
             //                "((Bpt > 17.5 && Bpt < 22.5) && Prediction > 0.90)  || "
             //                "((Bpt > 22.5 && Bpt < 30.0) && Prediction > 0.89)  || "
             //                "((Bpt > 30.0 && Bpt < 50.0) && Prediction > 0.75)) && BQvalue < 0.2";
-            SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) ";
+            SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && BQvalue < 0.15 ";
             //SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && Prediction > 0.58 && BQvalue < 0.15 ";
             //SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && ((Bpt > 7.5  && Bpt < 12.5 && Prediction > 0.24) || (Bpt > 12.5 && Bpt < 17.5 && Prediction > 0.38) || (Bpt > 17.5 && Bpt < 22.5 && Prediction > 0.44) || (Bpt > 22.5 && Bpt < 50 && Prediction > 0.10)) && BQvalue < 0.15  ";
         }
     }
 
-    else if (TREE != "ntmix"){ SELECTIONcuts = "Bnorm_svpvDistance_2D > 4 && Bpt > 7.5" ;} // Bnorm_svpvDistance_2D > 4 && Bpt > 7.5 && BtrkPtimb < 0.2 Bnorm_svpvDistance_2D > 4 &&
+    else if (TREE != "ntmix"){ SELECTIONcuts = "Bnorm_svpvDistance_2D > 4 && Bpt > 7.5"; } // Bnorm_svpvDistance_2D > 4 && Bpt > 7.5 && BtrkPtimb < 0.2 Bnorm_svpvDistance_2D > 4 &&
 
     //KSTAR_MASS 0.89594
 

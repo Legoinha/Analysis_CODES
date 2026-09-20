@@ -5,6 +5,7 @@
 #include "TStyle.h"
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -15,14 +16,18 @@
 // root -b -q 'ntmix_UNCpropagator.C("ntmix_PSI2S","ppRef","Bpt")'
 // root -b -q 'ntmix_UNCpropagator.C("ntmix_X3872","ppRef","nChargedTracks")'
 // root -b -q 'ntmix_UNCpropagator.C("ntmix_PSI2S","ppRef","nChargedTracks")'
+// root -b -q 'ntmix_UNCpropagator.C("ntmix_X3872","PbPb23","Bpt")'
+// root -b -q 'ntmix_UNCpropagator.C("ntmix_PSI2S","PbPb23","Bpt")'
 
 static TH1D* LoadUncHist(TString path, TString histName, TString cloneName)
 {
     TFile* f = TFile::Open(path, "READ");
-    TH1D* h = (TH1D*)f->Get(histName);
+    TH1D* h = nullptr;
+    f->GetObject(histName, h);
     TH1D* out = (TH1D*)h->Clone(cloneName);
     out->SetDirectory(nullptr);
     f->Close();
+    delete f;
     return out;
 }
 
@@ -35,11 +40,11 @@ static void PropagateOne(TString treename, TString system, TString var)
     TH1D* hFit = LoadUncHist(Form("../fitER/ROOTfiles/%s/systematicFILES/fit_totalSystematic_leadingUnc_%s_%s_%s.root",
                                   system.Data(), treename.Data(), system.Data(), var.Data()),
                              "hLeadingTotalUncPercent", "hFitModelUncPercent");
-    TH1D* hMap = LoadUncHist(Form("../effER/output/systematicFILES/mapVariation_leadingUnc_%s_%s_%s.root",
-                                  treename.Data(), system.Data(), var.Data()),
+    TH1D* hMap = LoadUncHist(Form("../effER/output/%s/ROOTs/DATA_MC_AGREEMENT_reweight_comparison_%s_%s_%s.root",
+                                  system.Data(), treename.Data(), system.Data(), var.Data()),
                              "hLeadingUncPercent", "hDataMCMapUncPercent");
-    TH1D* hMethod = LoadUncHist(Form("../effER/output/systematicFILES/method_leadingUnc_%s_%s_%s.root",
-                                     treename.Data(), system.Data(), var.Data()),
+    TH1D* hMethod = LoadUncHist(Form("../effER/output/%s/ROOTs/METHODS_comparison_%s_%s_%s.root",
+                                     system.Data(), treename.Data(), system.Data(), var.Data()),
                                 "hLeadingUncPercent", "hAccEffMethodUncPercent");
 
     TH1D* hTotal = (TH1D*)hFit->Clone(Form("hTotalUncPercent_%s_%s_%s", treename.Data(), system.Data(), var.Data()));
@@ -71,16 +76,9 @@ static void PropagateOne(TString treename, TString system, TString var)
     std::vector<std::string> colNames;
     colNames.push_back("Systematic source");
     for (int i = 1; i <= hTotal->GetNbinsX(); ++i) {
-        colNames.push_back(GetSystematicColumnLabel(var,
-                                                    hTotal->GetXaxis()->GetBinLowEdge(i),
-                                                    hTotal->GetXaxis()->GetBinUpEdge(i)));
+        colNames.push_back(GetSystematicColumnLabel(var,hTotal->GetXaxis()->GetBinLowEdge(i),hTotal->GetXaxis()->GetBinUpEdge(i)));
     }
-    std::vector<std::string> rowLabels = {
-        "Fit model",
-        "Data-MC discrepancy",
-        "Acc$\\times$Eff method",
-        "Total"
-    };
+    std::vector<std::string> rowLabels = {"Fit model", "Data-MC discrepancy", "Acc$\\times$Eff method", "Total"  };
 
     latex_tables_document(Form("output_ntmix/systematicFILES/ntmix_uncertainty_summary_%s_%s_%s_table", treename.Data(), system.Data(), var.Data()),
                           {static_cast<int>(colNames.size())},

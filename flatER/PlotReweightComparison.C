@@ -2,7 +2,6 @@
 #include <TFile.h>
 #include <TH1D.h>
 #include <TLegend.h>
-#include <TMath.h>
 #include <TROOT.h>
 #include <TStyle.h>
 #include <TSystem.h>
@@ -71,9 +70,9 @@ TString VariableAxisLabel(const TString &variable)
 
 void PlotReweightComparison(TString inputFile = "",
                             TString flatTreeName = "",
-                            TString sourceTree = "ntmix",
-                            TString systemName = "ppRef",
-                            TString particle = "",
+                            TString sourceTree  = "ntmix",
+                            TString systemName  = "ppRef",
+                            TString particle   = "",
                             TString promptness = "",
                             TString outputBase = "reweighting_comparisons",
                             TString variable = "Bpt",
@@ -81,7 +80,7 @@ void PlotReweightComparison(TString inputFile = "",
                             Int_t nBins = 100)
 {
     const Double_t xMin = 0.;
-    const Double_t xMax = 65.;
+    const Double_t xMax = 55.;
 
     std::unique_ptr<TFile> input(TFile::Open(inputFile, "READ"));
     if (!input || input->IsZombie()) {
@@ -119,8 +118,9 @@ void PlotReweightComparison(TString inputFile = "",
     gStyle->SetOptStat(0);
 
     const Double_t binWidth = (xMax - xMin) / nBins;
-    const TString title = Form(";%s;Normalized entries / %.3f",
-                               VariableAxisLabel(variable).Data(), binWidth);
+    const TString yAxisTitle = Form("Normalized entries / %.3f", binWidth);
+    const TString title = Form(";%s;%s", VariableAxisLabel(variable).Data(),
+                               yAxisTitle.Data());
     TH1D unweighted("unweighted", title, nBins, xMin, xMax);
     TH1D reweighted("reweighted", title, nBins, xMin, xMax);
     unweighted.Sumw2();
@@ -138,13 +138,11 @@ void PlotReweightComparison(TString inputFile = "",
             std::to_string(expectedEntries));
     }
 
-    const Double_t unweightedIntegral = unweighted.Integral();
-    const Double_t reweightedIntegral = reweighted.Integral();
-    if (unweightedIntegral <= 0. || reweightedIntegral <= 0.) {
+    if (unweighted.Integral() <= 0. || reweighted.Integral() <= 0.) {
         throw std::runtime_error("Empty unweighted or reweighted comparison histogram");
     }
-    unweighted.Scale(1. / unweightedIntegral);
-    reweighted.Scale(1. / reweightedIntegral);
+    unweighted.Scale(1. / unweighted.Integral());
+    reweighted.Scale(1. / reweighted.Integral());
 
     // Match the visual language used by plotER/plot_dataMC.C.
     unweighted.SetLineColor(kBlue);
@@ -153,18 +151,16 @@ void PlotReweightComparison(TString inputFile = "",
     reweighted.SetLineColor(kOrange - 2);
     reweighted.SetLineWidth(3);
     reweighted.SetFillStyle(0);
-    unweighted.SetMinimum(0.);
-    reweighted.SetMinimum(0.);
-
-    const Double_t maximum = TMath::Max(unweighted.GetMaximum(),
-                                        reweighted.GetMaximum()) * 1.21;
-    unweighted.SetMaximum(maximum);
-    reweighted.SetMaximum(maximum);
+    unweighted.SetMinimum(1.e-5);
+    reweighted.SetMinimum(1.e-5);
+    unweighted.SetMaximum(1.e-1);
+    reweighted.SetMaximum(1.e-1);
 
     TCanvas canvas("canvas", "", 600, 600);
     canvas.SetLeftMargin(0.15);
     canvas.SetTopMargin(0.05);
     canvas.SetRightMargin(0.05);
+    canvas.SetLogy();
     unweighted.Draw("HIST");
     reweighted.Draw("HIST SAME");
 
@@ -180,22 +176,10 @@ void PlotReweightComparison(TString inputFile = "",
 
     const TString outputStem = outputDirectory + "/" + systemName + "_" +
                                sample.fileTag + "_" + SafeFileToken(variable) + "_" +
-                               SafeFileToken(weightBranch);
+                               SafeFileToken(weightBranch) + "_normalized_log";
     const TString pdfFile = outputStem + ".pdf";
-    const TString rootFile = outputStem + ".root";
     canvas.SaveAs(pdfFile);
-
-    TFile histogramOutput(rootFile, "RECREATE");
-    if (histogramOutput.IsZombie()) {
-        throw std::runtime_error("Cannot create comparison ROOT file: " +
-                                 std::string(rootFile.Data()));
-    }
-    unweighted.Write("unweighted");
-    reweighted.Write("reweighted");
-    canvas.Write("canvas");
-    histogramOutput.Close();
 
     std::cout << "Saved unweighted/reweighted comparison:" << std::endl;
     std::cout << "  " << pdfFile << std::endl;
-    std::cout << "  " << rootFile << std::endl;
 }

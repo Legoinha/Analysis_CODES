@@ -16,8 +16,11 @@
 
 //// TO RUN
 
-// root -l -b -q plot_dataMC.C'("ntmix","ppRef")'
-// root -l -b -q plot_dataMC.C'("ntKp","ppRef")'
+// root -l -b -q 'plot_dataMC.C("ntmix_X3872","ppRef")'
+// root -l -b -q 'plot_dataMC.C("ntmix_X3872","PbPb23")'
+// root -l -b -q 'plot_dataMC.C("ntKp","PbPb23")'    // B+
+// root -l -b -q 'plot_dataMC.C("ntKstar","PbPb23")' // B0
+// root -l -b -q 'plot_dataMC.C("ntphi","PbPb23")'   // Bs
 
 //// TO RUN
 
@@ -59,34 +62,28 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         double xmax;
     };
     const PlotVariable variables[] = {
-        {"PVx",                       -0.1,  0.1},
-        {"PVy",                       -0.1,  0.1},
-        {"PVz",                      -30.0, 30.0},
-        {"PVnchi2",                    0.0,  1.0},
-        {"nChargedTracks",             0.0, 200.0},
-        {"nChargedTracks_LOOSE",       0.0, 200.0},
-        {"nChargedTracks_TIGHT",       0.0, 200.0},
-        {"CentBin",                    0.0, 200.0},
+        {"nChargedTracks",             0.0, 10000.0},
+        {"CentBin",                    0.0, 100.0},
         {"Bmass",                      3.6,  4.0},
         {"Bpt",                        0.0, 50.0},
         {"abs(By)",                    0.0,  2.4},
         {"Bchi2Prob",                  0.0,  1.0},
-        {"Btrk1dR",                    0.0,  1.5},
-        {"Btrk2dR",                    0.0,  1.5},
+        {"Btrk1dR",                    0.0,  .5},
+        {"Btrk2dR",                    0.0,  .5},
         {"BtrkPtimb",                  0.0,  1.0},
         {"Btktkpt",                    0.0, 10.0},
         {"Bujmass",                    2.9,  3.3},
         {"BujvProb",                   0.0,  1.0},
-        {"Bnorm_svpvDistance_2D",      0.0, 20.0},
+        {"Bnorm_svpvDistance_2D",      0.0,  10.0},
         {"BsvpvDistance_2D",           0.0,  0.25},
         {"BsvpvDisErr_2D",             0.0,  0.05},
         {"BQvalue",                    0.0,  0.6},
         {"Bnorm_trk1Dxy",             -7.0,  7.0},
         {"Bnorm_trk2Dxy",             -5.0,  5.0},
         {"Balpha",                     0.0,  3.2},
-        {"Bdtheta",                   -3.2,  3.2},
+        {"Bdtheta",                    0,  3.2},
         {"Bcos_dtheta",               -1.0,  1.0},
-        {"Btktkmass",                  0.0,  2.0},
+        {"Btktkmass",                  0.3,  1},
         {"Btrk1Pt",                    0.0, 10.0},
         {"Btrk2Pt",                    0.0, 10.0},
         {"Btrk1Eta",                  -2.4,  2.4},
@@ -114,8 +111,8 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         {"Btrk2Dz1",                  -0.5,  0.5},
         {"Btrk1DzError1",              0.0,  0.1},
         {"Btrk2DzError1",              0.0,  0.1},
-        {"Btrk1Dxy1",                 -0.2,  0.2},
-        {"Btrk2Dxy1",                 -0.2,  0.2},
+        {"Btrk1Dxy1",                 -0.05,  0.05},
+        {"Btrk2Dxy1",                 -0.05,  0.05},
         {"Btrk1DxyError1",             0.0,  0.1},
         {"Btrk2DxyError1",             0.0,  0.1},
         {"Btktketa",                  -2.4,  2.4},
@@ -126,7 +123,8 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         {"Bdoubletphi",               -3.2,  3.2},
         {"Bdoublety",                 -2.4,  2.4},
         {"Bnorm_trk1Dz",              -5.0,  5.0},
-        {"Bnorm_trk2Dz",              -5.0,  5.0}
+        {"Bnorm_trk2Dz",              -5.0,  5.0},
+        {"Prediction",                 0.0,  1.0}
     };
     //const char * variables[] = {"BQvalue"};
     //const double ranges[][2] = {{0,0.6}};
@@ -148,44 +146,65 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
     TString path_to_data = "";
     TString path_to_MC   = "";
     TString path_to_MC_spec = "";
-    TString baseDir = "";
+    const TString sharingDir = "/eos/user/h/hmarques/RUN3_Data_MC_sharing";
     if (TREE == "ntmix_X3872") {
+        TString sampleDir;
+        TString sampleTag;
         dataTreeName = "ntmix";
-        if (systemNAME.Contains("PbPb23")) {
-            path_to_MC      = Form("/eos/user/k/kprince/X3872_PbPb/MC_X3872_PbPb_AANN.root");
-            path_to_MC_spec = Form("/eos/user/k/kprince/X3872_PbPb/MC_PSI2S_PbPb_AANN.root");
-            path_to_data    = Form("/eos/user/k/kprince/X3872_PbPb/DATA_PbPb_AANN.root");
-            //path_to_MC = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_X3872.root");
-            //path_to_MC_spec = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_MC_PSI2S.root");
-            //path_to_data = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
-        } 
-        else if (systemNAME.Contains("PbPb24")) {
-            path_to_MC      = Form("/eos/user/k/kprince/X3872_PbPb/MC_X3872_24b_PbPb_AANN.root");
-            path_to_MC_spec = Form("/eos/user/k/kprince/X3872_PbPb/MC_PSI2S_24b_PbPb_AANN.root");
-            path_to_data    = Form("/eos/user/k/kprince/X3872_PbPb/DATA_24b_PbPb_AANN.root");
-        } else {
-            //path_to_data    = Form("/eos/user/k/kprince/X3872_pp_new/DATA_pp_VAANN.root");
-            //path_to_MC_spec = Form("/eos/user/k/kprince/X3872_pp_new/MC_PSI2S_pp_VAANN.root");
-            //path_to_MC      = Form("/eos/user/k/kprince/X3872_pp_new/MC_X3872_pp_VAANN.root");
-            path_to_MC = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_X3872.root");
-            path_to_MC_spec = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S.root");
-            path_to_data = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root");
-        }
+        mcTreeName = "ntmix_X3872";
         mcTreeNameSpec = "ntmix_PSI2S";
-    } else {
-        path_to_MC   = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/%s/flat_%s_%s_MC.root",systemNAME.Data(), TREE.Data(), systemNAME.Data());
-        path_to_data = Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/%s/flat_%s_%s_DATA.root",systemNAME.Data(), dataTreeName.Data(), systemNAME.Data());
+
+        if (systemNAME == "ppRef") {
+            sampleDir = "ppRef24";
+            sampleTag = "ppRef";
+            const TString sampleBase = Form("%s/X3872/%s", sharingDir.Data(), sampleDir.Data());
+            path_to_data = Form("%s/flat_ntmix_%s_DATA.root", sampleBase.Data(), sampleTag.Data());
+            path_to_MC = Form("%s/flat_ntmix_%s_MC_X3872.root", sampleBase.Data(), sampleTag.Data());
+            path_to_MC_spec = Form("%s/flat_ntmix_%s_MC_PSI2S.root", sampleBase.Data(), sampleTag.Data());
+        } else if (systemNAME == "PbPb23") {
+            const TString sampleBase = "/eos/user/h/hmarques/Analysis_CODES/X_pb23_v27_fid18_9v9_rw0_xgb_v1";
+            path_to_data = sampleBase + "/flat_ntmix_PbPb23_DATA.root";
+            path_to_MC = sampleBase + "/flat_ntmix_PbPb23_MC_X3872.root";
+            path_to_MC_spec = sampleBase + "/flat_ntmix_PbPb23_MC_PSI2S.root";
+        } else if (systemNAME == "PbPb24") {
+            sampleDir = systemNAME;
+            sampleTag = systemNAME;
+            const TString sampleBase = Form("%s/X3872/%s", sharingDir.Data(), sampleDir.Data());
+            path_to_data = Form("%s/flat_ntmix_%s_DATA.root", sampleBase.Data(), sampleTag.Data());
+            path_to_MC = Form("%s/flat_ntmix_%s_MC_X3872.root", sampleBase.Data(), sampleTag.Data());
+            path_to_MC_spec = Form("%s/flat_ntmix_%s_MC_PSI2S.root", sampleBase.Data(), sampleTag.Data());
+        } else {
+            std::cerr << "[plot_dataMC] Unsupported X(3872) system: " << systemNAME << std::endl;
+            return;
+        }
+    } else if (TREE == "ntKp" || TREE == "ntKstar" || TREE == "ntphi") {
+        
+        const TString sampleBase = Form("%s/Bmesons/%s", sharingDir.Data(), systemNAME.Data());
+        path_to_data = Form("%s/flat_%s_%s_DATA.root", sampleBase.Data(), TREE.Data(), systemNAME.Data());
+        path_to_MC = Form("%s/flat_%s_%s_MC.root", sampleBase.Data(), TREE.Data(), systemNAME.Data());
+    } 
+
+    std::cout << "[plot_dataMC] DATA: " << path_to_data << " (" << dataTreeName << ")" << std::endl;
+    std::cout << "[plot_dataMC] MC:   " << path_to_MC << " (" << mcTreeName << ")" << std::endl;
+    if (!path_to_MC_spec.IsNull()) {
+        std::cout << "[plot_dataMC] MC2:  " << path_to_MC_spec << " (" << mcTreeNameSpec << ")" << std::endl;
     }
+
     TChain chain(dataTreeName.Data());
-    chain.Add(path_to_data);
+    chain.Add(path_to_data.Data());
+    TFile *file_MC = TFile::Open(path_to_MC.Data(), "READ");
+    file_MC->GetObject(mcTreeName.Data(), tree_MC);
+    TFile *file_MC_spec = nullptr;
+    if (!path_to_MC_spec.IsNull()) {
+        file_MC_spec = TFile::Open(path_to_MC_spec.Data(), "READ");
+        file_MC_spec->GetObject(mcTreeNameSpec.Data(), tree_MC_spec);
+    }
     ////// OPEN FILES (MC AND DATA) //////
     ////// OPEN FILES (MC AND DATA) //////
 
-    std::cout << "DATA entries: " << chain.GetEntries()    << std::endl;
-    TFile::Open(path_to_MC.Data())->GetObject(mcTreeName.Data(), tree_MC  );
+    std::cout << "DATA entries: " << chain.GetEntries() << std::endl;
     std::cout << " MC entries: " << tree_MC->GetEntries() << std::endl;
-    if (path_to_MC_spec != "") {
-        TFile::Open(path_to_MC_spec.Data())->GetObject(mcTreeNameSpec.Data(), tree_MC_spec);
+    if (tree_MC_spec) {
         std::cout << " MC spec entries: " << tree_MC_spec->GetEntries() << std::endl;
     }
 
@@ -220,7 +239,7 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
             if (TREE == "ntKp")        {Xlabel = "m_{J/#Psi K^{+}} [GeV/c^{2}]";}
             else if (TREE == "ntKstar"){Xlabel = "m_{J/#Psi K^{+} #pi^{-}} [GeV/c^{2}]";}
             else if (TREE == "ntphi")  {Xlabel = "m_{J/#Psi K^{+} K^{-}} [GeV/c^{2}]";}
-            else if (TREE == "ntmix_X3872")  {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} [GeV/c^{2}]";}
+            else if (TREE == "ntmix_X3872") {Xlabel = "m_{J/#Psi #pi^{+} #pi^{-}} [GeV/c^{2}]";}
         }
         else if (var == "Bpt"){Xlabel = "p_{T} [GeV/c]";}
         else {                 Xlabel = var.Data();}
@@ -234,11 +253,23 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         if(TREE == "ntmix_X3872"){ sideband = "(((Bmass > 3.95) & (Bmass < 4.00)) || ((Bmass > 3.75) & (Bmass < 3.80)))";}
         else {sideband = "(Bmass > 5.55)";}
 
-        TString ANYsel = "1"; // Prediction > 0.59
-        TString ANA_region = "Bpt > 7.5 && Bpt < 50"; // Bpt > 10 && abs(By) < 1.6
+        TString ANYsel = "1";
+        TString ANA_region = "Bpt > 7.5 && Bpt < 50";
+        if (TREE == "ntmix_X3872" && (systemNAME == "ppRef")) {
+            ANA_region = "(Bpt > 7.5 && Bpt < 50) && "
+                         "Btrk1dR < 0.5 && Btrk2dR < 0.5 &&  "
+                         "BLxy*(Bmass/Bpt) < 0.05"; // enforce prompt component
+        }
+        if (TREE == "ntmix_X3872" && systemNAME == "PbPb23") {
+            ANA_region = "(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && "
+                         "(BQvalue < 0.15) && Btrk2dR <= 0.35 && "  // Prediction > 0.85 &&
+                         "BLxy*(Bmass/Bpt) < 0.01"; // enforce prompt component
+        }
         const TString mcCut = Form("%s && %s", ANYsel.Data(), ANA_region.Data());
         tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), mcSelection(tree_MC, mcCut));
         chain.Draw(Form("%s >> hist_BKG", var.Data()), Form(" %s && %s && %s", sideband.Data(), ANYsel.Data(), ANA_region.Data()));
+        const double selectedSignalEntries = hist_SIG->GetEntries();
+        const double selectedDataEntries = hist_BKG->GetEntries();
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 
@@ -300,12 +331,21 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         leg->SetFillStyle(0);
         leg->SetTextSize(0.035);
         leg->SetHeader(Form("#bf{%s}, %s", systemNAME.Data(), ANYsel.Data()));
-        if (TREE == "ntmix_X3872") leg->AddEntry(hist_SIG, "X(3872) MC", "l");
+        if (TREE == "ntmix_X3872" && var == "Bmass") {
+            leg->AddEntry(hist_SIG, Form("X(3872) MC, N_{sig} = %.0f", selectedSignalEntries), "l");
+        }
+        else if (TREE == "ntmix_X3872") leg->AddEntry(hist_SIG, "X(3872) MC", "l");
         else leg->AddEntry(hist_SIG, Form("%s MC", getPlotParticleLabel(TREE).Data()), "l");
         if (tree_MC_spec) {
-            leg->AddEntry(hist_spec, "#Psi(2S) MC", "l");
+            if (var == "Bmass") {
+                leg->AddEntry(hist_spec, Form("#Psi(2S) MC, N_{sig} = %.0f", hist_spec->GetEntries()), "l");
+            }
+            else leg->AddEntry(hist_spec, "#Psi(2S) MC", "l");
         }
-        leg->AddEntry(hist_BKG, "Data sideband", "f");
+        if (var == "Bmass") {
+            leg->AddEntry(hist_BKG, Form("Data sideband, N_{data} = %.0f", selectedDataEntries), "f");
+        }
+        else leg->AddEntry(hist_BKG, "Data sideband", "f");
         leg->AddEntry((TObject*)0, sidebandLine1.Data(), "");
         if (!sidebandLine2.IsNull()) leg->AddEntry((TObject*)0, sidebandLine2.Data(), "");
         leg->Draw();
@@ -319,6 +359,13 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         delete hist_spec;
         delete leg;
         delete canvas;
+    }
+
+    file_MC->Close();
+    delete file_MC;
+    if (file_MC_spec) {
+        file_MC_spec->Close();
+        delete file_MC_spec;
     }
 }
 
