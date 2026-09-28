@@ -396,8 +396,11 @@ inline void DrawCmsHeader(
 	if (!pad) return;
 	TString rightText = "";
 	if (COLsystem=="ppRef" || COLsystem=="ppRef_nonPrompt") rightText = "pp #sqrt{s}=5.36 TeV, (L=455.7 pb^{-1})" ;
-	else if (COLsystem=="PbPb") rightText = "PbPb #sqrt{s_{NN}}=5.36 TeV, (L=3.5 nb^{-1})" ;
-	else if (COLsystem=="PbPb23" || COLsystem=="PbPb23_nonPrompt") rightText = "PbPb23' #sqrt{s_{NN}}=5.36 TeV, (L=1.72 nb^{-1})" ;
+	else if (COLsystem=="PbPb18") rightText = "PbPb18' #sqrt{s_{NN}}=5.36 TeV, (L=1.7 nb^{-1})"  ;
+	else if (COLsystem=="PbPb23") rightText = "PbPb23' #sqrt{s_{NN}}=5.36 TeV, (L=1.72 nb^{-1})" ;
+	else if (COLsystem=="PbPb24") rightText = "PbPb24' #sqrt{s_{NN}}=5.36 TeV, (L=1.67 nb^{-1})" ;
+	else if (COLsystem=="PbPb25") rightText = "PbPb25' #sqrt{s_{NN}}=5.36 TeV, (L=2.31 nb^{-1})" ;
+	else if (COLsystem=="PbPb26") rightText = "PbPb26' #sqrt{s_{NN}}=5.36 TeV, (L=2.55 nb^{-1})" ;
 
 
 	pad->cd();

@@ -39,4 +39,3 @@ root -b -q "roofitB.C(\"ntmix_X3872\",\
                       \"$syst\", \
                       std::vector<double>{0,15,30,50,100})"
 
-rm -f roofitB_C.d roofitB_C_ACLiC_dict_rdict.pcm roofitB_C.so

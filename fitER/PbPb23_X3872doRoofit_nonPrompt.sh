@@ -20,7 +20,7 @@ mkdir -p "ROOTfiles/$syst" "results/$syst"
 
 
 if [ $DOANALYSISPbPb_FULL_X  -eq 1  ]; then
-root -b -q "roofitB.C++(\"ntmix_X3872\", \
+root -b -q "roofitB.C(\"ntmix_X3872\", \
                       1, \
                       \"$Data_X\", \
                       \"$MC_X\", \
@@ -31,7 +31,7 @@ root -b -q "roofitB.C++(\"ntmix_X3872\", \
 fi
 
 if [ $DOANALYSISPbPb_BINNED_PT_X  -eq 1  ]; then
-root -b -q "roofitB.C++(\"ntmix_X3872\",\
+root -b -q "roofitB.C(\"ntmix_X3872\",\
                       0, \
                       \"$Data_X\", \
                       \"$MC_X\", \
@@ -42,7 +42,7 @@ root -b -q "roofitB.C++(\"ntmix_X3872\",\
 fi
 
 if [ $DOANALYSISPbPb_BINNED_MULT_X  -eq 1  ]; then
-root -b -q "roofitB.C++(\"ntmix_X3872\",\
+root -b -q "roofitB.C(\"ntmix_X3872\",\
                       0, \
                       \"$Data_X\", \
                       \"$MC_X\", \
@@ -52,4 +52,3 @@ root -b -q "roofitB.C++(\"ntmix_X3872\",\
                       std::vector<double>{0,3800,8000})"
 fi
 
-rm -f roofitB_C.d roofitB_C_ACLiC_dict_rdict.pcm roofitB_C.so

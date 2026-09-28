@@ -13,7 +13,7 @@
 *.err
 *.sub
 
-X_pb23_v19_fid13_9v9_rw0_xgb_v1/
+X_pb23_v36_fid3_7v7_rw0_xgb_v1
 X_pb23_v7_fid5_9v4_rw0_xgb_v1/
 
 selectionER/.venv*/
@@ -28,8 +28,23 @@ selectionER/ML_xgboost/xgb_outputs/
 selectionER/ML_xgboost/scored_samples/
 selectionER/ML_xgboost/archived_optuna_runs/
 selectionER/ML_xgboost/*.json
+!selectionER/ML_xgboost/submit_*.sub
+selectionER/ML_tmva/condor_logs/
+selectionER/ML_tmva/tmva_outputs/
+selectionER/ML_tmva/scored_samples/
+!selectionER/ML_tmva/submit_*.sub
+selectionER/ML_pytorch/condor_logs/
+selectionER/ML_pytorch/nn_outputs/
+selectionER/ML_pytorch/scored_samples/
+!selectionER/ML_pytorch/submit_*.sub
+selectionER/skims/
+selectionER/feature_study/
+selectionER/.ML_sync_backups/
 __pycache__/
 */__pycache__/
+*.py[cod]
+*.orig
+*.rej
 *_C.d
 *_C.so
 *_C_ACLiC_dict_rdict.pcm

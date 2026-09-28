@@ -1,5 +1,5 @@
 DOANALYSISPbPb_FULL_X=1
-DOANALYSISPbPb_BINNED_PT_X=1
+DOANALYSISPbPb_BINNED_PT_X=0
 DOANALYSISPbPb_BINNED_Y_X=0
 DOANALYSISPbPb_BINNED_MULT_X=0
 
@@ -7,12 +7,12 @@ DOANALYSISPbPb_BINNED_MULT_X=0
 syst="PbPb23"
 
 #Data and MC Samples
-MC_X="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pb23_v19_fid13_9v9_rw0_xgb_v1/root_scored/flat_ntmix_PbPb23_MC_PSI2S.root"
-Data_X="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pb23_v19_fid13_9v9_rw0_xgb_v1/root_scored/flat_ntmix_PbPb23_DATA.root"
+MC_X="/eos/user/h/hmarques/Analysis_CODES/X_pb23_v36_fid3_7v7_rw0_xgb_v1/flat_ntmix_PbPb23_MC_PSI2S.root"
+Data_X="/eos/user/h/hmarques/Analysis_CODES/X_pb23_v36_fid3_7v7_rw0_xgb_v1/flat_ntmix_PbPb23_DATA.root"
 #Data and MC Samples
 
 ## SELECTION CUTs go here 
-CUTs="(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && (BQvalue < 0.15) && Btrk2dR <= 0.25 && Score > 0.85"
+CUTs="(Bpt > 15 && Bpt < 50) && BQvalue < 0.15 && (abs(By) < 1.6) && (Btrk2dR < 0.35) && (Btrk1dR < 0.35) && Prediction > 0.86"  
 
 #CUTs="1"  #"((Bpt > 5 && Bpt < 7.5) && abs(By) > 1.4) ||  (Bpt > 7.5 && Bpt < 50 && abs(By) < 2.4)"
 

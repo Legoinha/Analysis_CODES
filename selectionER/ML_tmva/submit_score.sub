@@ -1,0 +1,33 @@
+universe = vanilla
+sample = PbPb23
+fom = punzi
+sample_output_dir = tmva_outputs/ntmix_PbPb/pbpb23_punzi
+
+initialdir = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva
+executable = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva/run_tmva.sh
+arguments = -l -b -q TMVA_apply.C
+# The model and its report are read from the /eos mount of the worker: condor on EOS cannot transfer a folder in.
+environment = "ML_SAMPLE=$(sample) ML_FOM=$(fom) ML_KIND=$(kind) ML_OUTPUT_DIR=$(initialdir)/$(sample_output_dir) ML_USE_XROOTD=1"
+
+transfer_input_files = TMVA_apply.C, TMVA_config.h, TMVA_decorrelation.h
+transfer_output_files = scored_samples
+output = condor_logs/score_$(sample)_$(fom)_$(kind)_$(ClusterId).out
+error = condor_logs/score_$(sample)_$(fom)_$(kind)_$(ClusterId).err
+log = condor_logs/score_$(sample)_$(fom)_$(ClusterId).log
+
+getenv = False
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_cpus = 1
+request_memory = 6 GB
+request_disk = 4 GB
+requirements = (OpSysAndVer == "AlmaLinux9")
++JobFlavour = "workday"
+
+queue kind from (
+DATA
+MC_X3872
+MC_X3872_NONPROMPT
+MC_PSI2S
+MC_PSI2S_NONPROMPT
+)

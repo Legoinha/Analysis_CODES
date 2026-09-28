@@ -1,0 +1,27 @@
+universe = vanilla
+sample = PbPb23
+fom = punzi
+sample_output_dir = tmva_outputs/ntmix_PbPb/pbpb23_punzi
+njobs = 384
+
+initialdir = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva
+executable = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva/run_tmva.sh
+arguments = -l -b -q TMVA_optimize.C
+environment = "ML_SAMPLE=$(sample) ML_FOM=$(fom) ML_JOB=$(ProcId) ML_USE_XROOTD=1"
+
+transfer_input_files = TMVA_optimize.C, TMVA_config.h, TMVA_common.h
+transfer_output_files = $(sample_output_dir)/optimization/summary_job_$(ProcId).root
+output = condor_logs/optimize_$(sample)_$(fom)_$(ClusterId)_$(ProcId).out
+error = condor_logs/optimize_$(sample)_$(fom)_$(ClusterId)_$(ProcId).err
+log = condor_logs/optimize_$(sample)_$(fom)_$(ClusterId).log
+
+getenv = False
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_cpus = 1
+request_memory = 6 GB
+request_disk = 2 GB
+requirements = (OpSysAndVer == "AlmaLinux9")
++JobFlavour = "workday"
+
+queue $(njobs)

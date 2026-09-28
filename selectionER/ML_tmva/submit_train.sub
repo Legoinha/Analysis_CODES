@@ -1,0 +1,28 @@
+universe = vanilla
+sample = PbPb23
+fom = punzi
+sample_output_dir = tmva_outputs/ntmix_PbPb/pbpb23_punzi
+use_optimized = 1
+
+initialdir = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva
+executable = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva/run_tmva.sh
+arguments = -l -b -q TMVA_train.C
+# The scan summaries are read from the /eos mount of the worker: condor on EOS cannot transfer a folder in.
+environment = "ML_SAMPLE=$(sample) ML_FOM=$(fom) ML_USE_OPTIMIZED=$(use_optimized) ML_OPTIMIZATION_DIR=$(initialdir)/$(sample_output_dir)/optimization ML_USE_XROOTD=1"
+
+transfer_input_files = TMVA_train.C, TMVA_config.h, TMVA_common.h
+transfer_output_files = tmva_outputs
+output = condor_logs/train_$(sample)_$(fom)_$(ClusterId).out
+error = condor_logs/train_$(sample)_$(fom)_$(ClusterId).err
+log = condor_logs/train_$(sample)_$(fom)_$(ClusterId).log
+
+getenv = False
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_cpus = 1
+request_memory = 8 GB
+request_disk = 4 GB
+requirements = (OpSysAndVer == "AlmaLinux9")
++JobFlavour = "tomorrow"
+
+queue 1

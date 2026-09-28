@@ -61,6 +61,7 @@ TString SafeFileToken(TString value)
 TString VariableAxisLabel(const TString &variable)
 {
     if (variable == "Bpt") return "p_{T} [GeV/c]";
+    if (variable == "pthat") return "Generator #hat{p}_{T} [GeV/c]";
     if (variable == "CentBin") return "Centrality bin";
     if (variable.Contains("nChargedTracks")) return "Track multiplicity";
     return variable;
@@ -79,8 +80,10 @@ void PlotReweightComparison(TString inputFile = "",
                             TString weightBranch = "pThatreweight",
                             Int_t nBins = 100)
 {
+    const bool isPthat = (variable == "pthat");
     const Double_t xMin = 0.;
-    const Double_t xMax = 55.;
+    const Double_t xMax = isPthat ? 150. : 55.;
+    const Double_t yMax = isPthat ? 1. : 1.e-1;
 
     std::unique_ptr<TFile> input(TFile::Open(inputFile, "READ"));
     if (!input || input->IsZombie()) {
@@ -153,8 +156,8 @@ void PlotReweightComparison(TString inputFile = "",
     reweighted.SetFillStyle(0);
     unweighted.SetMinimum(1.e-5);
     reweighted.SetMinimum(1.e-5);
-    unweighted.SetMaximum(1.e-1);
-    reweighted.SetMaximum(1.e-1);
+    unweighted.SetMaximum(yMax);
+    reweighted.SetMaximum(yMax);
 
     TCanvas canvas("canvas", "", 600, 600);
     canvas.SetLeftMargin(0.15);

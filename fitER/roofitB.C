@@ -20,10 +20,10 @@ int nbinsmasshisto = 40;
 void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString treeName, TString sample, TString system="ppRef", TString DOselCUTS="1");
 
 // PDF VARIATION FOR SYST STUDIES
-int syst_study=1;
+int syst_study=0;
 
 // PROFILE LIKELIHOOD SIGNIFICANCE + INCLUSIVE SCAN
-int use_profile_likelihood = 1;
+int use_profile_likelihood = 0;
 
 void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TString INPUTMC = "", TString VAR = "", TString CUT = "", TString SYSTEM = "ppRef", std::vector<double> VAR_BINS = {}){
 

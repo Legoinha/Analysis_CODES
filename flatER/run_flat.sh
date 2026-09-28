@@ -78,6 +78,15 @@ if [[ "${#MATCHED_LISTS[@]}" -eq 0 ]]; then
   exit 1
 fi
 
+# MC: flatten all matched lists in one run. The pThat weights need n_gen of every
+# pThat sample of the group, counted over all of its files.
+COMBINED_LIST=""
+if [[ "${KIND}" == "MC" ]]; then
+  COMBINED_LIST="$(mktemp "/tmp/filelist_${TREE}_${SYSTEM}_MC${CASETAG}.XXXXXX.txt")"
+  awk 1 "${MATCHED_LISTS[@]}" > "${COMBINED_LIST}"
+  MATCHED_LISTS=("${COMBINED_LIST}")
+fi
+
 # Run the flattener once per matched list and tag each chunk with _0, _1, _2, ...
 for idx in "${!MATCHED_LISTS[@]}"; do
   FILELIST="${MATCHED_LISTS[$idx]}"
@@ -101,11 +110,14 @@ done
 # when the final file is opened immediately through EOS.
 hadd -f "${TMP_OUTPUT}" "${INDEXED_OUTPUTS[@]}"
 mv -f "${TMP_OUTPUT}" "${FINAL_OUTPUT}"
-rm -f "${INDEXED_OUTPUTS[@]}"
+rm -f "${INDEXED_OUTPUTS[@]}" ${COMBINED_LIST:+"${COMBINED_LIST}"}
 
-# Compare the unweighted and pThat-reweighted reconstructed pT shapes only
-# after all chunks have been merged. Data flattening is unchanged.
+# Compare the unweighted and pThat-reweighted reconstructed pT and generator pThat
+# shapes only after all chunks have been merged. The reweighted pThat spectrum must
+# be smooth across the sample thresholds; a step points to a wrong xsec or n_gen.
 if [[ "${KIND}" == "MC" ]]; then
   FLAT_TREE_NAME="${TREE}${PARTICLE}"
-  root -l -b -q "${PLOT_MACRO_NAME}(\"${FINAL_OUTPUT}\",\"${FLAT_TREE_NAME}\",\"${TREE}\",\"${SYSTEM}\",\"${PARTICLE}\",\"${PVSNP}\",\"${REWEIGHT_PLOT_DIR}\",\"Bpt\",\"pThatreweight\",100)"
+  for VARIABLE in Bpt pthat; do
+    root -l -b -q "${PLOT_MACRO_NAME}(\"${FINAL_OUTPUT}\",\"${FLAT_TREE_NAME}\",\"${TREE}\",\"${SYSTEM}\",\"${PARTICLE}\",\"${PVSNP}\",\"${REWEIGHT_PLOT_DIR}\",\"${VARIABLE}\",\"pThatreweight\",100)"
+  done
 fi

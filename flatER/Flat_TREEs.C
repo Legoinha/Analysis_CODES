@@ -1,14 +1,15 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TChain.h>
+#include <TLeaf.h>
 #include <TObjArray.h>
+#include <TVector2.h>
+#include <algorithm>
 #include <iostream>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
-#include <map>
 #include <string>
-#include <utility>
 #include "../plotER/aux/masses.h"
 #include "MCNormalization.h"
 
@@ -45,44 +46,60 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
         throw std::runtime_error("No input ROOT files were added from " + std::string(FILEIN.Data()));
     }
 
-    // Resolve and validate every MC input before creating an output file. The
-    // same per-campaign entry is later used by both the reco and gen chains.
-    MCNormalization::Registry mcNormalization;
-    MCNormalization::Context mcContext;
-    std::map<std::string, MCNormalization::Entry> mcNormalizationByFile;
+    // --------------------------------------------------
+    // Gen-level input chain, on exactly the same files as the reco chain
+    // --------------------------------------------------
+    TChain *tgen = new TChain("Bfinder/ntGen");
+    TObjArray *fileList = tin->GetListOfFiles();
+    if (fileList) {
+        TIter next(fileList);
+        TObject *obj = nullptr;
+        while ((obj = next())) {
+            const char *fname = obj->GetTitle();
+            tgen->Add(fname);
+        }
+    }
+
+    // A missing or non-float pthat branch would leave pthat at 0 and give every event the
+    // weight of the lowest pThat sample without stopping, so check it in every input file.
+    auto requirePthatBranch = [](TChain *chain) {
+        TBranch *branch = chain->GetTree()->GetBranch("pthat");
+        const TString type = branch ? branch->GetLeaf("pthat")->GetTypeName() : "missing";
+        if (type != "Float_t") {
+            throw std::runtime_error("pthat branch is " + std::string(type.Data()) + ", not Float_t, in " +
+                                     std::string(chain->GetFile()->GetName()));
+        }
+    };
+
+    // pThat weights for the merged inclusive pThat > X samples, per event from the
+    // generator pThat (see MCNormalization::PthatWeight). Used by the reco and gen trees.
+    // n_gen of each pThat sample is the number of Bfinder/ntGen events in its input files.
+    MCNormalization::PthatWeight pthatWeight;
     if (isMC) {
-        mcContext = MCNormalization::BuildContext(SYSTEM.Data(), TREENAME.Data(),
-                                                   PARTICLE.Data(), PVSNP.Data());
-        mcNormalization.Load(MCNORMFILE.Data());
-
-        std::map<std::string, std::pair<MCNormalization::Entry, int>> sampleSummary;
-        TObjArray *inputFiles = tin->GetListOfFiles();
-        if (!inputFiles || inputFiles->GetEntries() == 0) {
-            throw std::runtime_error("The MC chain has no input files to normalize");
+        MCNormalization::Registry mcNormalization(MCNORMFILE.Data());
+        auto group = mcNormalization.Group(MCNormalization::BuildContext(
+            SYSTEM.Data(), TREENAME.Data(), PARTICLE.Data(), PVSNP.Data()));
+        tgen->GetEntries();   // opens every file and fills the per-file entry offsets
+        const Long64_t *offsets = tgen->GetTreeOffset();
+        std::vector<int> filesPerSample(group.size(), 0);
+        for (Int_t i = 0; i < tgen->GetNtrees(); ++i) {
+            const std::size_t k = MCNormalization::SampleIndex(group, tgen->GetListOfFiles()->At(i)->GetTitle());
+            group[k].nGenerated += offsets[i + 1] - offsets[i];
+            ++filesPerSample[k];
         }
-
-        TIter nextInput(inputFiles);
-        TObject *inputObject = nullptr;
-        while ((inputObject = nextInput())) {
-            const std::string fileName = inputObject->GetTitle();
-            const auto entry = mcNormalization.Resolve(fileName, mcContext);
-            mcNormalizationByFile[fileName] = entry;
-            const std::string summaryKey = entry.pathPattern + "|" + std::to_string(entry.pthat);
-            auto inserted = sampleSummary.emplace(summaryKey, std::make_pair(entry, 0));
-            ++inserted.first->second.second;
-        }
+        pthatWeight = MCNormalization::PthatWeight(group);
 
         std::cout << "MC normalization table: " << MCNORMFILE << std::endl;
-        std::cout << "pThat sample normalization (xsec_pb * filter_eff / n_gen):" << std::endl;
-        for (const auto &item : sampleSummary) {
-            const auto &entry = item.second.first;
-            std::cout << "  pThat=" << std::setw(2) << entry.pthat
-                      << "  files=" << std::setw(3) << item.second.second
-                      << "  xsec(pb)=" << entry.xsecPb
-                      << "  filterEff=" << entry.filterEfficiency
-                      << "  nGen=" << entry.nGenerated
-                      << "  pThatreweight=" << std::setprecision(12) << entry.Weight()
-                      << std::setprecision(6) << std::endl;
+        std::cout << "pThat weights, w = 1 / sum of L_j over samples with pThat_j below the event pThat:" << std::endl;
+        for (std::size_t k = 0; k < group.size(); ++k) {
+            std::cout << "  pThat > " << std::setw(2) << group[k].pthat
+                      << "  files=" << std::setw(4) << filesPerSample[k]
+                      << "  xsec(pb)=" << group[k].xsecPb
+                      << "  filterEff=" << group[k].filterEfficiency
+                      << "  nGen=" << group[k].nGenerated
+                      << "  L=" << 1. / group[k].Weight()
+                      << "  weight for events in this pThat range=" << std::setprecision(12)
+                      << 1. / pthatWeight.cumulativeLuminosity_[k] << std::setprecision(6) << std::endl;
         }
     }
 
@@ -96,42 +113,8 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     // the file larger, such cycles can retain references to a chunk's old path.
     tout->SetAutoSave(0);
 
-    // --------------------------------------------------
-    // Prepare gen-level input chain and output tree
-    // --------------------------------------------------
-    TChain *tgen = new TChain("Bfinder/ntGen");
-    // Reuse exactly the same file list used by the reco chain
-    TObjArray *fileList = tin->GetListOfFiles();
-    if (fileList) {
-        TIter next(fileList);
-        TObject *obj = nullptr;
-        while ((obj = next())) {
-            const char *fname = obj->GetTitle();
-            tgen->Add(fname);
-        }
-    }
-
     TTree *tgenOut = nullptr;
 
-    auto updateMCWeight = [&](TChain *chain, Int_t &activeTreeNumber,
-                              Double_t &weight) {
-        const Int_t treeNumber = chain->GetTreeNumber();
-        if (treeNumber == activeTreeNumber) return;
-        activeTreeNumber = treeNumber;
-
-        if (!chain->GetFile()) {
-            throw std::runtime_error("Cannot determine the current MC input file");
-        }
-        const std::string fileName = chain->GetFile()->GetName();
-        auto match = mcNormalizationByFile.find(fileName);
-        if (match == mcNormalizationByFile.end()) {
-            // Handles harmless path spelling differences between TChainElement
-            // and the file opened by ROOT while preserving the same validation.
-            match = mcNormalizationByFile.emplace(
-                fileName, mcNormalization.Resolve(fileName, mcContext)).first;
-        }
-        weight = match->second.Weight();
-    };
 
     // --------------------------------------------------
     // Input reconstructed branches 
@@ -223,6 +206,8 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tin->SetBranchAddress("nChargedTracks_LOOSE", &nChargedTracks_LOOSE);
     tin->SetBranchAddress("nChargedTracks_TIGHT", &nChargedTracks_TIGHT);
     tin->SetBranchAddress("CentBin", &CentBin);
+    Float_t pthat = 0.;
+    if (isMC) tin->SetBranchAddress("pthat", &pthat);
     tin->SetBranchAddress("Bmass", Bmass);
     tin->SetBranchAddress("BvtxX", BvtxX);
     tin->SetBranchAddress("BvtxY", BvtxY);
@@ -319,6 +304,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     float Bdoubletpt_out, Bdoubleteta_out, Bdoubletphi_out, Bdoublety_out;
     bool BdiTrackFitValid_out;
     int CentBin_out;
+    // The trk1/trk2 and mu1/mu2 labels are not ordered, so these symmetric versions are kept
+    // too: pT-ordered values, pT fractions of the B, and the largest and smallest Delta R and
+    // |eta|. Muon Delta R is to the J/psi, like Btrk1dR and Btrk2dR. ntKp has one track only.
+    const bool twoTrack = (TREENAME != "ntKp");
+    float BtrkLeadPt_out, BtrkSubPt_out, BtrkLeadPtFrac_out, BtrkSubPtFrac_out, BtrkMaxdR_out, BtrkMindR_out, BtrkMaxAbsEta_out;
+    float BmuLeadPt_out, BmuSubPt_out, BmuMaxdR_out, BmuMindR_out, BmuMaxAbsEta_out;
     Double_t pThatreweight_out = 1.;
 
     tout->Branch("PVx", &PVx_out, "PVx/F");
@@ -389,16 +380,31 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tout->Branch("Bdoublety", &Bdoublety_out, "Bdoublety/F");
     tout->Branch("Bnorm_trk1Dz", &Bnorm_trk1Dz_out, "Bnorm_trk1Dz/F");
     tout->Branch("Bnorm_trk2Dz", &Bnorm_trk2Dz_out, "Bnorm_trk2Dz/F");
+    if (twoTrack) {
+        tout->Branch("BtrkLeadPt", &BtrkLeadPt_out, "BtrkLeadPt/F");
+        tout->Branch("BtrkSubPt", &BtrkSubPt_out, "BtrkSubPt/F");
+        tout->Branch("BtrkLeadPtFrac", &BtrkLeadPtFrac_out, "BtrkLeadPtFrac/F");
+        tout->Branch("BtrkSubPtFrac", &BtrkSubPtFrac_out, "BtrkSubPtFrac/F");
+        tout->Branch("BtrkMaxdR", &BtrkMaxdR_out, "BtrkMaxdR/F");
+        tout->Branch("BtrkMindR", &BtrkMindR_out, "BtrkMindR/F");
+        tout->Branch("BtrkMaxAbsEta", &BtrkMaxAbsEta_out, "BtrkMaxAbsEta/F");
+    }
+    tout->Branch("BmuLeadPt", &BmuLeadPt_out, "BmuLeadPt/F");
+    tout->Branch("BmuSubPt", &BmuSubPt_out, "BmuSubPt/F");
+    tout->Branch("BmuMaxdR", &BmuMaxdR_out, "BmuMaxdR/F");
+    tout->Branch("BmuMindR", &BmuMindR_out, "BmuMindR/F");
+    tout->Branch("BmuMaxAbsEta", &BmuMaxAbsEta_out, "BmuMaxAbsEta/F");
     if (isMC){
         tout->Branch("Bgen", &Bgen_out, "Bgen/F");
         tout->Branch("pThatreweight", &pThatreweight_out, "pThatreweight/D");
+        tout->Branch("pthat", &pthat, "pthat/F");
     }
 
     // --------------------------------------------------
     // Event loop
     // --------------------------------------------------
     Long64_t nentries = tin->GetEntries();
-    Int_t activeRecoTreeNumber = -1;
+    Int_t activeRecoTree = -1;
     std::cout << "Processing " << nentries << " entries..." << std::endl;
     for(Long64_t ev=0; ev<nentries; ++ev)
     {
@@ -408,8 +414,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
                       << " (" << (100.0*ev/nentries) << "%)" << std::endl;
         }
         if (tin->LoadTree(ev) < 0) break;
-        if (isMC) updateMCWeight(tin, activeRecoTreeNumber, pThatreweight_out);
+        if (isMC && tin->GetTreeNumber() != activeRecoTree) {
+            activeRecoTree = tin->GetTreeNumber();
+            requirePthatBranch(tin);
+        }
         tin->GetEntry(ev);
+        if (isMC) pThatreweight_out = pthatWeight(pthat);
 
         // Event-level variables
         PVx_out = PVx;
@@ -540,6 +550,23 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
             Bnorm_trk1Dz_out = Bnorm_trk1Dz[i];
             Bnorm_trk2Dz_out = Bnorm_trk2Dz[i];
 
+            if (twoTrack) {
+                BtrkLeadPt_out = std::max(Btrk1Pt_out, Btrk2Pt_out);
+                BtrkSubPt_out = std::min(Btrk1Pt_out, Btrk2Pt_out);
+                BtrkLeadPtFrac_out = BtrkLeadPt_out / Bpt_out;
+                BtrkSubPtFrac_out = BtrkSubPt_out / Bpt_out;
+                BtrkMaxdR_out = std::max(Btrk1dR_out, Btrk2dR_out);
+                BtrkMindR_out = std::min(Btrk1dR_out, Btrk2dR_out);
+                BtrkMaxAbsEta_out = std::max(std::abs(Btrk1Eta_out), std::abs(Btrk2Eta_out));
+            }
+            const float mu1dR = std::hypot(Bmu1eta_out - Bujeta_out, TVector2::Phi_mpi_pi(Bmu1phi_out - Bujphi_out));
+            const float mu2dR = std::hypot(Bmu2eta_out - Bujeta_out, TVector2::Phi_mpi_pi(Bmu2phi_out - Bujphi_out));
+            BmuLeadPt_out = std::max(Bmu1pt_out, Bmu2pt_out);
+            BmuSubPt_out = std::min(Bmu1pt_out, Bmu2pt_out);
+            BmuMaxdR_out = std::max(mu1dR, mu2dR);
+            BmuMindR_out = std::min(mu1dR, mu2dR);
+            BmuMaxAbsEta_out = std::max(std::abs(Bmu1eta_out), std::abs(Bmu2eta_out));
+
             if(!std::isfinite(Bmass_out) || !std::isfinite(Bpt_out) || !std::isfinite(By_out) || !std::isfinite(Bnorm_trk1Dxy_out) ||
             !std::isfinite(CentBin_out) || !std::isfinite(Bchi2Prob_out) || !std::isfinite(Btrk1dR_out) || !std::isfinite(Bnorm_svpvDistance_2D_out)) continue;
             tout->Fill();
@@ -580,6 +607,8 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
         tgen->SetBranchAddress("GpdgId", GpdgId);
         tgen->SetBranchAddress("Gpt", Gpt);
         tgen->SetBranchAddress("Gy", Gy);
+        Float_t pthat_gen = 0.;
+        tgen->SetBranchAddress("pthat", &pthat_gen);
 
         // Output tree (flat)
         tgenOut = new TTree("ntGen", "Gen-level (flat, filtered)");
@@ -600,13 +629,18 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
         tgenOut->Branch("Gpt", &Gpt_out, "Gpt/F");
         tgenOut->Branch("Gy", &Gy_out, "Gy/F");
         tgenOut->Branch("pThatreweight", &pThatreweight_gen_out, "pThatreweight/D");
+        tgenOut->Branch("pthat", &pthat_gen, "pthat/F");
 
         const Long64_t ngen = tgen->GetEntries();
-        Int_t activeGenTreeNumber = -1;
+        Int_t activeGenTree = -1;
         for (Long64_t ev=0; ev<ngen; ++ev) {
             if (tgen->LoadTree(ev) < 0) break;
-            updateMCWeight(tgen, activeGenTreeNumber, pThatreweight_gen_out);
+            if (tgen->GetTreeNumber() != activeGenTree) {
+                activeGenTree = tgen->GetTreeNumber();
+                requirePthatBranch(tgen);
+            }
             tgen->GetEntry(ev);
+            pThatreweight_gen_out = pthatWeight(pthat_gen);
             for (int i=0; i<Gsize; ++i) {
 
                 if (TREENAME == "ntmix" && GisSignal[i] != 7) continue;               // keep only signal ntmix candidates for the selected MC sample

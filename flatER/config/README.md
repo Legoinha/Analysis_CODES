@@ -57,69 +57,72 @@ Important details:
 
 ## MC pThat normalization
 
-MC flattening reads `config/mc_normalization.csv` and adds a `Double_t` branch named
-`pThatreweight` to both the flattened reconstructed tree and `ntGen`. Every candidate
-from a given source campaign receives the same campaign weight:
+MC flattening reads `config/mc_normalization.csv` and adds two branches to both the
+flattened reconstructed tree and `ntGen`: `pthat`, the generator pThat copied from the
+forest, and `pThatreweight`, the event weight.
+
+The MC productions are inclusive: the sample `pThat-X` contains every event with
+pThat > X. The samples therefore overlap, and an event with generator pThat `p` can
+come from every sample with threshold X_j < p. The merged sample has luminosity
+`L_1 + ... + L_k` there, so each event is weighted by
 
 ```text
-pThatreweight = xsec_pb * filter_eff / n_gen
+pThatreweight(p) = 1 / sum_{X_j < p} L_j,     L_j = n_gen_j / (xsec_pb_j * filter_eff_j)
 ```
 
-The value is stored, not automatically multiplied into the other branches. This is
-intentional: a ROOT `TTree` cannot permanently attach a different implicit weight to
-each entry, and changing the physical feature values would be incorrect. Downstream
-histograms or fits should therefore use `pThatreweight` explicitly.
+The sum runs over all pThat rows of the same system, tree, particle and promptness.
+Events with p between the two lowest thresholds keep the plain weight of the lowest
+sample; above each further threshold the weight drops because more samples cover it.
+This is the combined-sample form of the legacy recipe in
+`Bfinder/Bfinder/weighPthat/weighPurePthat.C`, (sigma_k - sigma_k+1) / N_k, and agrees
+with it in expectation. Adding the samples with the per-campaign weight
+`xsec * filter_eff / n_gen` instead would count pThat > 10 twice, pThat > 15 three
+times, and so on.
 
-This implements the requested direct campaign normalization; it does not impose
-exclusive generator-pThat intervals. If the productions are truly inclusive
-`pThat > threshold` samples, the overlap/stitching convention should be confirmed
-before a physics result is made from their sum.
+This needs forests made with the Bfinder version that stores `pthat` in `ntmix` and
+`ntGen` (from the `GenEventInfoProduct` binning value). Older forests have no
+`pthat` branch.
+
+The value is stored, not automatically multiplied into the other branches.
+Downstream histograms or fits should use `pThatreweight` explicitly.
 
 The normalization table columns are:
 
 ```text
-system,tree,particle,promptness,pthat,path_pattern,xsec_pb,filter_eff,n_gen
+system,tree,particle,promptness,pthat,path_pattern,xsec_pb,filter_eff
 ```
 
-`path_pattern` identifies the production campaign and is independent of whether it
-is an official or private sample. Before creating an output, the flattener validates
-every MC file against exactly one row and checks that all `pThat`/`phat` tokens in its
-path agree with the table. Missing, ambiguous, duplicated, or non-physical entries
-stop the job instead of assigning a default weight.
+`pthat` is the generation threshold X of the campaign. `n_gen` is not in the table:
+`Flat_TREEs.C` assigns every input file to its campaign by `path_pattern` (exactly one
+row of the group must match its path) and counts `n_gen` as the number of
+Bfinder/ntGen events in the files of that campaign. The log prints the files and
+`n_gen` found per campaign. A campaign without input files has `n_gen = 0` and adds no
+luminosity. Because the weight sums over all campaigns of a group, `run_flat.sh` joins
+all matched MC file lists into one flattening run. To enable PbPb24 or another system,
+add its rows to the same CSV. Data flattening neither reads this table nor creates the
+two branches.
 
-The current registry uses ppRef and PbPb23 production-table cross sections/filter
-efficiencies and actual full-campaign input event counts for `n_gen`. Nominal
-requested counts must not be substituted for the count in the files being
-flattened. Campaigns that are not present on EOS are omitted until they can be
-counted. To enable PbPb24 or another system later, add its rows to the same CSV; no
-change to the flattening logic is required. Data flattening neither reads this table
-nor creates the `pThatreweight` branch.
-
-
-
-
-
-
-
-
-
-
-
-
-
+The flattener stops with an error when an MC input file has no `pthat` branch or a
+branch that is not `Float_t`. Without this check ROOT would only print an error and
+leave `pthat = 0`, giving every event the weight of the lowest pThat campaign.
 
 ## Reweighting comparison plots
 
 After producing the final merged MC file, `run_flat.sh` automatically compares the
-reconstructed `Bpt` distribution before and after applying `pThatreweight`. Both
+reconstructed `Bpt` and the generator `pthat` distributions before and after applying
+`pThatreweight`. The reweighted `pthat` spectrum must be smooth across the campaign
+thresholds (5, 10, 15, 30, 50); a step there points to a wrong `xsec_pb`,
+`filter_eff`, or missing input files of one campaign. Both
 histograms are normalized to unit area and the y-axis is logarithmic. The style follows
 `plotER/plot_dataMC.C`: a blue hatched
 unweighted distribution and an orange reweighted line on a 600x600 canvas.
 
 The comparison presentation is fixed; there is no plot-mode argument. The logarithmic
-y-axis range is fixed to 10^-5 through 10^-1 for direct comparison across samples.
+y-axis range of the Bpt plots is fixed to 10^-5 through 10^-1 for direct comparison
+across samples.
 
-The Bpt comparison uses 100 bins from 0 to 55 GeV/c. Each comparison is saved only
+The Bpt comparison uses 100 bins from 0 to 55 GeV/c; the pthat comparison uses 100
+bins from 0 to 150 GeV/c with the y-axis up to 1. Each comparison is saved only
 as a PDF under:
 
 ```text
@@ -178,8 +181,7 @@ The current ppRef `ntKstar` (B0) and `ntphi` (Bs) flat files do not contain the
 after weighted flat outputs become available.
 
 Future centrality or multiplicity comparisons can use the same function by passing
-their variable and weight branch. Automatic runner production currently remains
-restricted to `Bpt` with `pThatreweight`.
+their variable and weight branch. The runner produces the `Bpt` and `pthat` plots.
 
 For example, with:
 
@@ -204,9 +206,11 @@ Workflow:
 
 1. `run_flat.sh` scans `filelists/DATA` or `filelists/MC`
 2. it keeps only the `.txt` files matching the requested case
-3. it runs `Flat_TREEs.C` once per matched list, using `_0`, `_1`, `_2`, ... as `NUN`
-4. for MC, it validates each input campaign and assigns `pThatreweight`
+3. it runs `Flat_TREEs.C` once per matched list, using `_0`, `_1`, `_2`, ... as `NUN`;
+   for MC, all matched lists are joined into one run (`_0`)
+4. for MC, it counts `n_gen` per pThat campaign and assigns `pThatreweight` per event
+   from the generator `pthat`
 5. it writes chunk outputs like `flat_ntmix_ppRef_DATA_0.root` in `flatER/` and keeps them at that creation path while merging
 6. it always rebuilds a self-contained final file with `hadd`, even for one chunk
 7. it removes the temporary chunk `.root` files
-8. for MC, it saves the unweighted/reweighted `Bpt` comparison PDF and ROOT file
+8. for MC, it saves the unweighted/reweighted `Bpt` and `pthat` comparison PDFs

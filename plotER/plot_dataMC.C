@@ -18,6 +18,7 @@
 
 // root -l -b -q 'plot_dataMC.C("ntmix_X3872","ppRef")'
 // root -l -b -q 'plot_dataMC.C("ntmix_X3872","PbPb23")'
+// root -l -b -q 'plot_dataMC.C("ntmix_X3872","PbPb18")'
 // root -l -b -q 'plot_dataMC.C("ntKp","PbPb23")'    // B+
 // root -l -b -q 'plot_dataMC.C("ntKstar","PbPb23")' // B0
 // root -l -b -q 'plot_dataMC.C("ntphi","PbPb23")'   // Bs
@@ -124,6 +125,18 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         {"Bdoublety",                 -2.4,  2.4},
         {"Bnorm_trk1Dz",              -5.0,  5.0},
         {"Bnorm_trk2Dz",              -5.0,  5.0},
+        {"BtrkLeadPt",                  0.0, 10.0},
+        {"BtrkSubPt",                   0.0, 10.0},
+        {"BtrkLeadPtFrac",              0.0,  1.0},
+        {"BtrkSubPtFrac",               0.0,  1.0},
+        {"BtrkMaxdR",                   0.0,  0.5},
+        {"BtrkMindR",                   0.0,  0.5},
+        {"BtrkMaxAbsEta",               0.0,  2.4},
+        {"BmuLeadPt",                   0.0, 25.0},
+        {"BmuSubPt",                    0.0, 25.0},
+        {"BmuMaxdR",                    0.0,  1.0},
+        {"BmuMindR",                    0.0,  1.0},
+        {"BmuMaxAbsEta",                0.0,  2.4},
         {"Prediction",                 0.0,  1.0}
     };
     //const char * variables[] = {"BQvalue"};
@@ -162,10 +175,15 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
             path_to_MC = Form("%s/flat_ntmix_%s_MC_X3872.root", sampleBase.Data(), sampleTag.Data());
             path_to_MC_spec = Form("%s/flat_ntmix_%s_MC_PSI2S.root", sampleBase.Data(), sampleTag.Data());
         } else if (systemNAME == "PbPb23") {
-            const TString sampleBase = "/eos/user/h/hmarques/Analysis_CODES/X_pb23_v27_fid18_9v9_rw0_xgb_v1";
+            const TString sampleBase = Form("%s/X3872/PbPb23", sharingDir.Data());
             path_to_data = sampleBase + "/flat_ntmix_PbPb23_DATA.root";
             path_to_MC = sampleBase + "/flat_ntmix_PbPb23_MC_X3872.root";
             path_to_MC_spec = sampleBase + "/flat_ntmix_PbPb23_MC_PSI2S.root";
+        } else if (systemNAME == "PbPb18") {
+            const TString sampleBase = Form("%s/X3872/legacy_run2/REflated", sharingDir.Data());
+            path_to_data = sampleBase + "/flat_ntmix_PbPb18_DATA.root";
+            path_to_MC = sampleBase + "/flat_ntmix_PbPb18_MC_X3872.root";
+            path_to_MC_spec = sampleBase + "/flat_ntmix_PbPb18_MC_PSI2S.root";
         } else if (systemNAME == "PbPb24") {
             sampleDir = systemNAME;
             sampleTag = systemNAME;
@@ -261,9 +279,12 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
                          "BLxy*(Bmass/Bpt) < 0.05"; // enforce prompt component
         }
         if (TREE == "ntmix_X3872" && systemNAME == "PbPb23") {
-            ANA_region = "(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && "
-                         "(BQvalue < 0.15) && Btrk2dR <= 0.35 && "  // Prediction > 0.85 &&
-                         "BLxy*(Bmass/Bpt) < 0.01"; // enforce prompt component
+            ANA_region = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && "
+                         "(BQvalue < 0.15) && (Bchi2Prob > 0.05)";
+        }
+        else if (TREE == "ntmix_X3872" && systemNAME == "PbPb18") {
+            ANA_region = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && "
+                         "(BQvalue < 0.15) && (Bchi2Prob > 0.1)";
         }
         const TString mcCut = Form("%s && %s", ANYsel.Data(), ANA_region.Data());
         tree_MC->Draw(Form("%s >> hist_SIG", var.Data()), mcSelection(tree_MC, mcCut));

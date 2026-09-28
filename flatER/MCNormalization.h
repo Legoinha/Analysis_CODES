@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -28,7 +27,7 @@ struct Entry {
     std::string pathPattern;
     double xsecPb = 0.;
     double filterEfficiency = 0.;
-    long long nGenerated = 0;
+    long long nGenerated = 0;   // counted from Bfinder/ntGen of the flattened input files
 
     double Weight() const
     {
@@ -118,8 +117,8 @@ public:
 
             const auto fields = SplitCsvLine(line);
             if (Lower(fields.empty() ? "" : fields[0]) == "system") continue;
-            if (fields.size() != 9) {
-                throw std::runtime_error("Expected 9 columns in " + fileName + ":" +
+            if (fields.size() != 8) {
+                throw std::runtime_error("Expected 8 columns in " + fileName + ":" +
                                          std::to_string(lineNumber));
             }
 
@@ -133,7 +132,6 @@ public:
                 entry.pathPattern = Lower(fields[5]);
                 entry.xsecPb = std::stod(fields[6]);
                 entry.filterEfficiency = std::stod(fields[7]);
-                entry.nGenerated = std::stoll(fields[8]);
             } catch (const std::exception &error) {
                 throw std::runtime_error("Invalid value in " + fileName + ":" +
                                          std::to_string(lineNumber) + " (" + error.what() + ")");
@@ -142,20 +140,11 @@ public:
             if (entry.system.empty() || entry.tree.empty() || entry.particle.empty() ||
                 entry.promptness.empty() || entry.pathPattern.empty() || entry.pthat < 0 ||
                 entry.xsecPb <= 0. || entry.filterEfficiency <= 0. ||
-                entry.filterEfficiency > 1. || entry.nGenerated <= 0) {
+                entry.filterEfficiency > 1.) {
                 throw std::runtime_error("Non-physical or empty value in " + fileName + ":" +
                                          std::to_string(lineNumber));
             }
 
-            for (const auto &previous : entries_) {
-                if (previous.system == entry.system && previous.tree == entry.tree &&
-                    previous.particle == entry.particle &&
-                    previous.promptness == entry.promptness &&
-                    previous.pathPattern == entry.pathPattern) {
-                    throw std::runtime_error("Duplicate MC normalization path pattern in " +
-                                             fileName + ":" + std::to_string(lineNumber));
-                }
-            }
             entries_.push_back(entry);
         }
 
@@ -164,54 +153,64 @@ public:
         }
     }
 
-    Entry Resolve(const std::string &fileName, const Context &context) const
+    // All rows of one MC group (system, tree, particle, promptness), sorted by pThat threshold.
+    std::vector<Entry> Group(const Context &context) const
     {
-        const std::string pathLower = Lower(fileName);
-        std::vector<const Entry *> matches;
-        for (const auto &entry : entries_) {
+        std::vector<Entry> group;
+        for (const auto &entry : entries_)
             if (entry.system == context.system && entry.tree == context.tree &&
-                entry.particle == context.particle &&
-                entry.promptness == context.promptness &&
-                pathLower.find(entry.pathPattern) != std::string::npos) {
-                matches.push_back(&entry);
-            }
-        }
-
-        if (matches.size() != 1) {
-            std::ostringstream message;
-            message << "Expected exactly one MC normalization row, found " << matches.size()
-                    << " for file '" << fileName << "' (system=" << context.system
-                    << ", tree=" << context.tree << ", particle=" << context.particle
-                    << ", promptness=" << context.promptness << ")";
-            throw std::runtime_error(message.str());
-        }
-
-        ValidatePthatInPath(pathLower, *matches.front());
-        return *matches.front();
+                entry.particle == context.particle && entry.promptness == context.promptness)
+                group.push_back(entry);
+        std::sort(group.begin(), group.end(),
+                  [](const Entry &a, const Entry &b) { return a.pthat < b.pthat; });
+        return group;
     }
 
 private:
-    static void ValidatePthatInPath(const std::string &path, const Entry &entry)
+    std::vector<Entry> entries_;
+};
+
+// The pThat sample of one input file: the single group row whose path_pattern is in its path.
+inline std::size_t SampleIndex(const std::vector<Entry> &group, const std::string &fileName)
+{
+    const std::string pathLower = Lower(fileName);
+    std::vector<std::size_t> matches;
+    for (std::size_t k = 0; k < group.size(); ++k)
+        if (pathLower.find(group[k].pathPattern) != std::string::npos) matches.push_back(k);
+    if (matches.size() != 1) {
+        throw std::runtime_error("Expected exactly one MC normalization row for '" + fileName +
+                                 "', found " + std::to_string(matches.size()));
+    }
+    return matches.front();
+}
+
+// Weight for merged inclusive "pThat > X" samples. An event with generator pThat p
+// can come from every sample j with X_j < p, so the merged sample has luminosity
+// sum_{X_j < p} L_j there, with L_j = n_gen_j / (xsec_j * filter_eff_j):
+//     w(p) = 1 / sum_{X_j < p} L_j
+// A sample without input files has n_gen = 0 and adds no luminosity.
+class PthatWeight {
+public:
+    PthatWeight() = default;
+    explicit PthatWeight(const std::vector<Entry> &group)
     {
-        const std::regex pthatExpression("(pthat|phat)[-_]?([0-9]+)",
-                                         std::regex_constants::icase);
-        bool found = false;
-        for (std::sregex_iterator match(path.begin(), path.end(), pthatExpression), end;
-             match != end; ++match) {
-            found = true;
-            const int pthatInPath = std::stoi((*match)[2].str());
-            if (pthatInPath != entry.pthat) {
-                throw std::runtime_error("pThat mismatch: table has " +
-                                         std::to_string(entry.pthat) + ", path contains " +
-                                         std::to_string(pthatInPath) + " in '" + path + "'");
-            }
-        }
-        if (!found) {
-            throw std::runtime_error("No pThat/phat token found in MC path: " + path);
+        double luminosity = 0.;
+        for (const auto &entry : group) {
+            luminosity += 1. / entry.Weight();
+            thresholds_.push_back(entry.pthat);
+            cumulativeLuminosity_.push_back(luminosity);
         }
     }
 
-    std::vector<Entry> entries_;
+    double operator()(float pthat) const
+    {
+        std::size_t k = 0;
+        while (k + 1 < thresholds_.size() && pthat > thresholds_[k + 1]) ++k;
+        return 1. / cumulativeLuminosity_[k];
+    }
+
+    std::vector<int> thresholds_;
+    std::vector<double> cumulativeLuminosity_;
 };
 
 } // namespace MCNormalization
