@@ -82,8 +82,9 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
                                         bool drawRatioPanel = true,
                                         const TString& legendHeader = "")
 {
-    const TString outputDir = targetDir == "" ? "output/" + system + "/systematicFILES" : targetDir;
-    const TString rootOutputDir = "output/" + system + "/ROOTs";
+    const TString caseDir = Form("output/%s/%s", treename.Data(), system.Data());
+    const TString outputDir = targetDir == "" ? caseDir + "/systematicFILES" : targetDir;
+    const TString rootOutputDir = caseDir + "/ROOTs";
     gSystem->mkdir(outputDir, true);
     gSystem->mkdir(rootOutputDir, true);
 
@@ -135,14 +136,14 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
         nominal.hAvg->Clone(Form("hFrameRatio_%s", leadingStem.Data())));
     hFrameRatio->SetDirectory(nullptr);
     hFrameRatio->Reset("ICES");
-    hFrameRatio->SetTitle(Form(";%s;Variation / %s",
-                               axisTitle.Data(), nominal.method.label.Data()));
+    hFrameRatio->SetTitle(Form(";%s;Ratio", axisTitle.Data()));
     hFrameRatio->SetStats(0);
     hFrameRatio->GetXaxis()->SetTitleSize(0.12);
     hFrameRatio->GetXaxis()->SetTitleOffset(1.05);
     hFrameRatio->GetXaxis()->SetLabelSize(0.10);
     hFrameRatio->GetYaxis()->SetTitleSize(0.10);
     hFrameRatio->GetYaxis()->SetTitleOffset(0.55);
+    hFrameRatio->GetYaxis()->CenterTitle();
     hFrameRatio->GetYaxis()->SetLabelSize(0.09);
     hFrameRatio->GetYaxis()->SetNdivisions(505);
 
@@ -205,7 +206,7 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
         results[index].hAvg->SetMarkerSize(1.0);
         results[index].hAvg->SetLineWidth(2);
         results[index].hAvg->Draw("E1 SAME");
-        legend->AddEntry(results[index].hAvg, results[index].method.label, "lep");
+        legend->AddEntry(results[index].hAvg, index == nominalIndex ? results[index].method.label + " (ref.)" : results[index].method.label, "lep");
     }
     legend->Draw();
 
@@ -214,10 +215,7 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
     label.SetTextFont(42);
     label.SetTextSize(0.052);
     label.SetTextAlign(33);
-    TString particleLabel;
-    if (treename == "ntmix_X3872") particleLabel = "#bf{X(3872)}";
-    if (treename == "ntmix_PSI2S") particleLabel = "#bf{#psi(2S)}";
-    label.DrawLatex(0.90, 0.62, particleLabel);
+    label.DrawLatex(0.90, 0.62, FitParticleLabel(treename, true));
     label.SetTextSize(0.035);
     label.DrawLatex(0.90, 0.56, system);
 
@@ -271,13 +269,13 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
             const double low = nominal.hAvg->GetXaxis()->GetBinLowEdge(bin);
             const double high = nominal.hAvg->GetXaxis()->GetBinUpEdge(bin);
             TString columnLabel;
-            if (var == "Bpt") columnLabel = Form("%g$<p_T<$%g", low, high);
-            if (var == "By") columnLabel = Form("%g$<|y|<$%g", low, high);
+            if (var == "Bpt") columnLabel = Form("%g$\\leq p_T<$%g", low, high);
+            if (var == "By") columnLabel = Form("%g$\\leq |y|<$%g", low, high);
             if (var == "nChargedTracks") {
-                columnLabel = Form("%g$<nTrks<$%g", low, high);
+                columnLabel = Form("%g$\\leq nTrks<$%g", low, high);
             }
             if (var == "CentBin") {
-                columnLabel = Form("%g$<Centrality<$%g", low, high);
+                columnLabel = Form("%g$\\leq Centrality<$%g", low, high);
             }
             columnNames.emplace_back(columnLabel.Data());
         }
@@ -290,7 +288,10 @@ inline void SaveEffVariationSystematics(const std::vector<EffResult>& results,
 
         TFile output(Form("%s/%s.root", rootOutputDir.Data(), leadingStem.Data()), "RECREATE");
         hLeading->Write("hLeadingUncPercent");
-        for (const auto& result : results) result.hAvg->Write();
+        for (const auto& result : results) {
+            result.hAvg->Write();
+            if (result.hYield) result.hYield->Write();
+        }
         output.Close();
         delete hLeading;
     }

@@ -24,11 +24,14 @@
 #include <memory>
 #include <vector>
 
-// One call reads one exact (dimension, efficiency-weight, reading-method) case.
-// METHOD is exactly "sPlot" or "mWindow".
+#include "aux/uti.h"
+
+// One call reads one exact (dimension, efficiency-weight, reading-method) case of one tree in one year, with the
+// binned fit of the year (../fitER/ROOTfiles/<YEAR>/). METHOD is exactly "sPlot" or "mWindow".
 //
 // root -l -b -q 'accXeff_READ.C("ntmix_PSI2S","PbPb23","Bpt","sPlot","2D","raw")'
 // root -l -b -q 'accXeff_READ.C("ntmix_PSI2S","PbPb23","Bpt","mWindow","2D","raw")'
+// root -l -b -q 'accXeff_READ.C("ntKp","PbPb24","Bpt","sPlot","2D","raw")'
 void accXeff_READ(TString treename = "ntmix_X3872",
                   TString SYSTEM = "ppRef",
                   TString VAR = "Bpt",
@@ -36,27 +39,14 @@ void accXeff_READ(TString treename = "ntmix_X3872",
                   TString DIMENSION = "2D",
                   TString WEIGHT = "raw")
 {
-    const TString outputDir = "output/" + SYSTEM;
+    const TString outputDir = Form("output/%s/%s", treename.Data(), SYSTEM.Data());
     gSystem->mkdir(outputDir + "/ROOTs", true);
     gSystem->mkdir(outputDir + "/ACCxEFF_plots", true);
     gStyle->SetOptStat(0);
 
-    TString particleTag;
-    TString particleLabel;
-    double signalMass = 0.0;
-    double signalWindow = 0.0;
-    if (treename == "ntmix_X3872") {
-        particleTag = "X3872";
-        particleLabel = "X(3872)";
-        signalMass = 3.87164;
-        signalWindow = 0.020;
-    }
-    if (treename == "ntmix_PSI2S") {
-        particleTag = "PSI2S";
-        particleLabel = "#psi(2S)";
-        signalMass = 3.68610;
-        signalWindow = 0.015;
-    }
+    const AccEffSetup setup = GetAccEffSetup(treename, SYSTEM);
+    const double signalMass = setup.mass;
+    const double signalWindow = setup.window;
 
     TString axisTitle;
     if (VAR == "Bpt") axisTitle = "p_{T} [GeV]";
@@ -83,7 +73,7 @@ void accXeff_READ(TString treename = "ntmix_X3872",
     const int nBins = static_cast<int>(bins.size()) - 1;
 
     const TString mapPath = Form(
-        "%s/ROOTs/%s_%s%smap_ACCxEFF_%s.root",
+        "%s/ROOTs/%s_%s_%smap_ACCxEFF_%s.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data(),
         DIMENSION.Data(), WEIGHT.Data());
     std::unique_ptr<TFile> mapFile(TFile::Open(mapPath, "READ"));
@@ -108,7 +98,6 @@ void accXeff_READ(TString treename = "ntmix_X3872",
             int analysisBin = static_cast<int>(
                 std::upper_bound(bins.begin(), bins.end(), analysisValue)
                 - bins.begin()) - 1;
-            if (analysisValue == bins.back()) --analysisBin;
             if (analysisBin < 0 || analysisBin >= nBins) continue;
 
             int mapBin = 0;
@@ -140,7 +129,7 @@ void accXeff_READ(TString treename = "ntmix_X3872",
     if (METHOD == "sPlot") {
         for (int bin = 1; bin <= nBins; ++bin) {
             const TString cut = Form(
-                "abs(%s)>=%.12g && abs(%s)<=%.12g",
+                "abs(%s)>=%.12g && abs(%s)<%.12g",
                 VAR.Data(), bins[bin - 1], VAR.Data(), bins[bin]);
             std::unique_ptr<RooDataSet> data(
                 static_cast<RooDataSet*>(source->reduce(cut.Data())));
@@ -155,11 +144,12 @@ void accXeff_READ(TString treename = "ntmix_X3872",
             while (TObject* object = iterator->Next()) {
                 static_cast<RooRealVar*>(object)->setConstant(true);
             }
-            signalYield->setRange(0.0, 2.0 * data->numEntries());
-            backgroundYield->setRange(0.0, 2.0 * data->numEntries());
-            signalYield->setConstant(false);
-            backgroundYield->setConstant(false);
             RooArgList yields(*signalYield, *backgroundYield);
+            if (treename == "ntKp") yields.add(*workspace->var(Form("nbkg_part_r%d_", bin)));
+            for (RooAbsArg* yield : yields) {
+                static_cast<RooRealVar*>(yield)->setRange(0.0, 2.0 * data->numEntries());
+                static_cast<RooRealVar*>(yield)->setConstant(false);
+            }
             RooStats::SPlot sPlot(
                 Form("sData_bin%d", bin), "sData", *data, model, yields);
             const TString signalWeight =
@@ -273,7 +263,7 @@ void accXeff_READ(TString treename = "ntmix_X3872",
     TNamed("mapCase", WEIGHT.Data()).Write();
     TNamed("mapFile", mapPath.Data()).Write();
     TNamed("fitFile", fitPath.Data()).Write();
-    TNamed("appliedWeightParticle", particleTag.Data()).Write();
+    TNamed("appliedWeightParticle", setup.particleTag.Data()).Write();
     TNamed("appliedWeightVariable",
            WEIGHT == "raw" ? "none" : WEIGHT.Data()).Write();
     TNamed("selectionCut", fitSelection.Data()).Write();
@@ -299,7 +289,7 @@ void accXeff_READ(TString treename = "ntmix_X3872",
     label.SetNDC();
     label.SetTextSize(0.045);
     label.SetTextAlign(31);
-    label.DrawLatex(0.88, 0.86, particleLabel);
+    label.DrawLatex(0.88, 0.86, FitParticleLabel(treename));
     canvas.SaveAs(Form(
         "%s/ACCxEFF_plots/%s_AvgInvEffxAcc.pdf",
         outputDir.Data(), stem.Data()));

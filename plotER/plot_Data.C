@@ -14,7 +14,7 @@
 #include "aux/parameters.h"
 #include "aux/masses.h"
 
-void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb23"){
+void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
     gStyle->SetOptStat(0);
 
     // Create a TChain and add all files from the directory
@@ -57,7 +57,7 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb23"){
         } else if (systemNAME.Contains("PbPb18")) {
             SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && (BQvalue < 0.15) && (Bchi2Prob > 0.1)";  
         } else {
-            SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && BQvalue < 0.15 ";
+            SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && (BQvalue < 0.15) ";
             //SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && Prediction > 0.58 && BQvalue < 0.15 ";
         }
     }

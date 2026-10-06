@@ -1,0 +1,34 @@
+universe = vanilla
+tree = ntmix
+year = PbPb23
+fom = auc
+trials = 100
+max_epochs = 150
+early_stopping = 15
+timeout_hours = 20
+summary_subdir = optuna_summaries
+njobs = 200
+sample_output_dir = nn_outputs/$(tree)/$(year)_$(fom)
+summary_name = optuna_summary_$(tree)_$(year)_$(fom)_$(ClusterId)_seed$(ProcId).json
+
+initialdir = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_pytorch
+executable = run_nn_batch.sh
+arguments = NN_optuna.py --case $(tree)/$(year) --fom $(fom) --trials $(trials) --max-epochs $(max_epochs) --early-stopping $(early_stopping) --timeout-hours $(timeout_hours) --summary-subdir $(summary_subdir) --scan-tag $(ClusterId) --seed $(ProcId)
+
+transfer_input_files = NN_optuna.py, NN_train.py, ../ML_common/ml_fom.py, ../ML_common/ml_samples.py, ../ML_common/ml_decorrelation.py, ../ML_common/ml_plots.py, ../../settings.py
+transfer_output_files = $(sample_output_dir)/$(summary_subdir)/$(summary_name)
+
+output = condor_logs/optuna_$(tree)_$(year)_$(fom)_$(ClusterId)_$(ProcId).out
+error = condor_logs/optuna_$(tree)_$(year)_$(fom)_$(ClusterId)_$(ProcId).err
+log = condor_logs/optuna_$(tree)_$(year)_$(fom)_$(ClusterId).log
+
+getenv = False
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_cpus = 4
+request_memory = 8 GB
+request_disk = 2 GB
+requirements = (OpSysAndVer == "AlmaLinux9")
++JobFlavour = "tomorrow"
+
+queue $(njobs)

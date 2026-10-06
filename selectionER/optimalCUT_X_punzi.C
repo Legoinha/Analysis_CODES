@@ -14,6 +14,7 @@
 #include "TLatex.h"
 #include "TLine.h"
 #include "TMath.h"
+#include "TPaveText.h"
 #include "TObjString.h"
 #include "TParameter.h"
 #include "TString.h"
@@ -21,38 +22,35 @@
 #include "TSystem.h"
 #include "TTree.h"
 
-#include "../plotER/aux/masses.h"
+// The cases and their mass windows, pT bins and Punzi settings, written from ML_selection/settings.py.
+#include "ML_selection/methods/ML_tmva/ml_settings.h"
 
-// Punzi optimization of the classifier threshold for one system, one classifier, and the
-// FOM its hyperparameters were selected with (auc, sigeff, pauc, punzi; see fresh_ML_scan.sh).
+// Punzi optimization of the classifier threshold for one case ("<tree>/<year>": ntmix/PbPb23,
+// ntKp/ppRef, ...), one classifier, and the FOM its hyperparameters were selected with (auc, sigeff,
+// pauc, punzi; see ML_selection/scripts/fresh_ML_scan.sh).
 //
-// Inputs are the scored samples of the classifier, read from its fixed folder
-//   <ML folder>/scored_samples/flat_ntmix_<system>_<fom>_scored_{DATA,MC_X3872}.root
+// Inputs are the scored samples of the classifier, read from the folder of the case
+//   scored_samples/<tree>/<year>/flat_<tree>_<year>_<classifier>_<fom>_scored_{DATA,<signal kind>}.root
 // Every scored file carries a metadata/ directory written by the apply step: tree name,
 // score branch and range, MC weight, and the pre-ML cut the classifier was trained with.
 // That pre-ML cut is the pre-cut of the optimization.
 //
-// Outputs go to optimalCUT/<classifier>/<system>_<fom>/:
+// Outputs go to optimalCUT/<tree>/<year>/<classifier>_<fom>/:
 //   punzi_scan_<bin>.pdf   FOM versus threshold, one per pT bin
 //   punzi_summary.tex      table of the optimal thresholds
 //   punzi_summary.root     metadata/ and the punziResults tree, one entry per bin,
 //                          including the full selection string for downstream code
 //
 // to run, from selectionER/:
-//   root -l -b -q 'optimalCUT_X_punzi.C("PbPb23","xgb","punzi")'
-// classifier is nn, xgb or tmva, as in fresh_ML_scan.sh and train_best_ML.sh.
-// The signal window and sidebands below are written by fresh_ML_scan.sh.
+//   root -l -b -q 'optimalCUT_X_punzi.C("ntKp/PbPb23","xgb","punzi")'
+// classifier is nn, xgb or tmva, as in fresh_ML_scan.sh and train_best_ML.sh. The Punzi window and
+// sidebands around the peak, the pT bins and the threshold grid are those of the case in
+// ML_selection/settings.py.
 //
 // Samples scored outside this framework have no metadata/ directory: set MANUAL_INPUT
 // below and give the files, trees, pre-cut, and score by hand. The classifier and fom
 // arguments then only name the output folder, e.g.
-//   root -l -b -q 'optimalCUT_X_punzi.C("PbPb23","external","manual")'
-
-static const std::map<TString, TString> CLASSIFIER_DIRS = {
-    {"nn", "ML_pytorch"},
-    {"xgb", "ML_xgboost"},
-    {"tmva", "ML_tmva"},
-};
+//   root -l -b -q 'optimalCUT_X_punzi.C("ntmix/PbPb23","external","manual")'
 
 // Manual input, used instead of the scored-sample metadata when MANUAL_INPUT is true.
 static const bool MANUAL_INPUT = false;
@@ -67,23 +65,6 @@ static const double MANUAL_SCORE_MAX = 1.0;
 static const TString MANUAL_MC_WEIGHT = "pThatreweight";
 static const TString MANUAL_MODEL = "external classifier";
 
-// Analysis pT bins. They must lie inside the pT range of the classifier pre-cut.
-static const std::map<TString, std::vector<double>> PT_BINS = {
-    {"ppRef", {7.5, 12.5, 17.5, 22.5, 50.0}},
-    {"PbPb18", {15.0, 50.0}},
-    {"PbPb23", {15.0, 50.0}},
-};
-
-static const double THRESHOLD_STEP = 0.02;
-
-// Signal window and sidebands around the X(3872) mass, in GeV. The MC peak has a core
-// sigma of about 5 MeV; the sidebands stay clear of the training sidebands, which start
-// 18 MeV above and 22 MeV below the peak.
-static const double SIGNAL_HALF_WIDTH = 0.005;
-static const double SIDEBAND_START = 0.015;
-static const double SIDEBAND_WIDTH = 0.02;
-// The Punzi maximum only among cuts keeping at least this many DATA sideband candidates.
-static const double PUNZI_MIN_BACKGROUND = 10.0;
 
 struct PunziBin {
     double low;
@@ -104,17 +85,17 @@ struct PunziResult {
     double bestBkg = 0.0;
 };
 
-// Thresholds scanned on the classifier score: min + k * step for k = 0 .. nSteps - 1.
+// Thresholds scanned on the classifier score: min + k * (max - min) / nSteps for k = 0 .. nSteps - 1.
 struct ScoreGrid {
     double min;
     double max;
     int nSteps;
-    double threshold(int k) const { return min + k * (max - min) / nSteps; }
 };
 
 // The inputs shared by every pT bin.
 struct PunziInputs {
     TString system;
+    MLSettings::Case settings;
     TString classifier;
     TString fom;
     TString model;
@@ -128,19 +109,6 @@ struct PunziInputs {
     TString sidebandCut;
     ScoreGrid grid;
 };
-
-TString metadata(TFile* file, const char* key)
-{
-    return file->Get<TObjString>(Form("metadata/%s", key))->GetString();
-}
-
-double punziSmin(double backgroundYield, double a, double b)
-{
-    const double sqrtB = TMath::Sqrt(backgroundYield);
-    return b * b / 2.0
-           + a * sqrtB
-           + b / 2.0 * TMath::Sqrt(b * b + 4.0 * a * sqrtB + 4.0 * backgroundYield);
-}
 
 // Weighted number of candidates passing `selection` with a score above threshold k,
 // for every threshold of the grid, filled in a single pass over the tree.
@@ -165,21 +133,23 @@ PunziResult optimizeBin(const PunziInputs& in, const PunziBin& bin, const TStrin
     const std::vector<double> signal = countsAboveThresholds(in.mc, in.scoreBranch, in.mcWeight, result.preCut, in.grid);
     const std::vector<double> sideband = countsAboveThresholds(
         in.data, in.scoreBranch, "1", Form("(%s) && (%s)", result.preCut.Data(), in.sidebandCut.Data()), in.grid);
-    const double sidebandToSignalWindow = SIGNAL_HALF_WIDTH / SIDEBAND_WIDTH;
+    const double sidebandToSignalWindow = in.settings.punziHalfWidth / in.settings.punziSidebandWidth * 2 / in.settings.punziSides.size();
 
     TGraph graph;
     for (int k = 0; k < in.grid.nSteps; ++k) {
         const double sigEff = signal[k] / signal[0];
         if (!(sigEff > 0.0)) continue;
 
+        const double threshold = in.grid.min + k * (in.grid.max - in.grid.min) / in.grid.nSteps;
         const double bkg = sideband[k] * sidebandToSignalWindow;
-        const double fom = sigEff / punziSmin(bkg, a, b);
-        if (!std::isfinite(fom) || sideband[k] < PUNZI_MIN_BACKGROUND) continue;
+        const double sqrtB = TMath::Sqrt(bkg);
+        const double fom = sigEff / (b * b / 2.0 + a * sqrtB + b / 2.0 * TMath::Sqrt(b * b + 4.0 * a * sqrtB + 4.0 * bkg));
+        if (!std::isfinite(fom) || sideband[k] < MLSettings::PUNZI_MIN_BACKGROUND) continue;
 
-        graph.SetPoint(graph.GetN(), in.grid.threshold(k), fom);
+        graph.SetPoint(graph.GetN(), threshold, fom);
         if (fom > result.bestRatio) {
             result.bestRatio = fom;
-            result.bestThreshold = in.grid.threshold(k);
+            result.bestThreshold = threshold;
             result.bestSignalEff = sigEff;
             result.bestBkg = bkg;
         }
@@ -207,10 +177,20 @@ PunziResult optimizeBin(const PunziInputs& in, const PunziBin& bin, const TStrin
     label.SetTextSize(0.035);
     label.DrawLatex(0.16, 0.86, Form("%s, %s (%s)", in.system.Data(), in.classifier.Data(), in.fom.Data()));
     label.DrawLatex(0.16, 0.81, bin.plotLabel);
-    label.DrawLatex(0.16, 0.76, Form("Best threshold = %.2f", result.bestThreshold));
+    label.DrawLatex(0.16, 0.76, Form("Best threshold = %.3f", result.bestThreshold));
+
+    // The sample name in a box at the top right corner, as on every figure of the ML selection.
+    TPaveText sampleBox(0.85, 0.935, 0.995, 0.995, "NDC");
+    sampleBox.SetFillColor(kWhite);
+    sampleBox.SetLineColor(kGray + 1);
+    sampleBox.SetBorderSize(1);
+    sampleBox.SetTextFont(62);
+    sampleBox.SetTextSize(0.035);
+    sampleBox.AddText(in.system);
+    sampleBox.Draw();
 
     c.SaveAs(Form("%s/punzi_scan_%s.pdf", outDir.Data(), bin.fileTag.Data()));
-    std::cout << Form("%s %s %s: best threshold = %.2f, FOM = %.6f, signal eff. = %.4f, bkg = %.1f",
+    std::cout << Form("%s %s %s: best threshold = %.3f, FOM = %.6f, signal eff. = %.4f, bkg = %.1f",
                       in.system.Data(), in.classifier.Data(), bin.plotLabel.Data(),
                       result.bestThreshold, result.bestRatio, result.bestSignalEff, result.bestBkg)
               << std::endl;
@@ -258,7 +238,7 @@ void writeRootSummary(const TString& outDir, const PunziInputs& in,
     };
     put("input", MANUAL_INPUT ? "manual (MANUAL_INPUT in optimalCUT_X_punzi.C)" : "scored-sample metadata");
     put("classifier", in.classifier);
-    put("sample", in.system);
+    put("sample", in.settings.tree + "/" + in.settings.year);
     put("fom", in.fom);
     put("model", in.model);
     put("data_file", in.dataPath);
@@ -269,7 +249,7 @@ void writeRootSummary(const TString& outDir, const PunziInputs& in,
     put("mc_weight", in.mcWeight);
     put("pre_cut", in.classifierPreCut);
     put("sideband_cut", in.sidebandCut);
-    put("signal_window", Form("|Bmass - %.5f| < %.4f", X3872_MASS, SIGNAL_HALF_WIDTH));
+    put("signal_window", Form("|Bmass - %.5f| < %.4f", in.settings.peak, in.settings.punziHalfWidth));
     TParameter<double> aParameter("a", a);
     TParameter<double> bParameter("b", b);
     meta->WriteTObject(&aParameter);
@@ -318,17 +298,19 @@ void writeRootSummary(const TString& outDir, const PunziInputs& in,
     output.Close();
 }
 
-// a is the discovery Z-score; b is the power/exclusion Z-score.
-// The defaults target 5-sigma discovery with the approximate 2-sigma exclusion convention.
-void optimalCUT_X_punzi(TString system = "PbPb23", TString classifier = "xgb", TString fom = "punzi",
-                        double a = 5.0, double b = 2.0)
+// a is the discovery Z-score; b is the power/exclusion Z-score (settings.py PUNZI_A and PUNZI_B:
+// 5-sigma discovery with the approximate 2-sigma exclusion convention).
+void optimalCUT_X_punzi(TString caseName = "ntmix/PbPb23", TString classifier = "xgb", TString fom = "punzi",
+                        double a = MLSettings::PUNZI_A, double b = MLSettings::PUNZI_B)
 {
     gStyle->SetOptStat(0);
 
     const TString macroDir = gSystem->DirName(__FILE__);
 
     PunziInputs in;
-    in.system = system;
+    in.settings = MLSettings::CASES.at(caseName);
+    const MLSettings::Case &c = in.settings;
+    in.system = c.tree + " " + c.year;
     in.classifier = classifier;
     in.fom = fom;
     TFile* fileData = nullptr;
@@ -348,30 +330,33 @@ void optimalCUT_X_punzi(TString system = "PbPb23", TString classifier = "xgb", T
         in.grid.min = MANUAL_SCORE_MIN;
         in.grid.max = MANUAL_SCORE_MAX;
     } else {
-        const TString scoredDir = Form("%s/%s/scored_samples", macroDir.Data(), CLASSIFIER_DIRS.at(classifier).Data());
-        in.dataPath = Form("%s/flat_ntmix_%s_%s_scored_DATA.root", scoredDir.Data(), system.Data(), fom.Data());
-        in.mcPath = Form("%s/flat_ntmix_%s_%s_scored_MC_X3872.root", scoredDir.Data(), system.Data(), fom.Data());
+        const TString stem = Form("%s/scored_samples/%s/%s/flat_%s_%s_%s_%s_scored_", macroDir.Data(), c.tree.Data(),
+                                  c.year.Data(), c.tree.Data(), c.year.Data(), classifier.Data(), fom.Data());
+        in.dataPath = stem + c.inputs.at("data").kind + ".root";
+        in.mcPath = stem + c.inputs.at("signal").kind + ".root";
         fileData = TFile::Open(in.dataPath);
         fileX = TFile::Open(in.mcPath);
-        in.data = fileData->Get<TTree>(metadata(fileData, "tree"));
-        in.mc = fileX->Get<TTree>(metadata(fileX, "tree"));
-        in.model = metadata(fileData, "model");
-        in.scoreBranch = metadata(fileData, "score_branch");
-        in.mcWeight = metadata(fileX, "mc_weight");
-        in.classifierPreCut = metadata(fileData, "pre_cut");
-        in.grid.min = metadata(fileData, "score_min").Atof();
-        in.grid.max = metadata(fileData, "score_max").Atof();
+        in.data = fileData->Get<TTree>(fileData->Get<TObjString>("metadata/tree")->GetString());
+        in.mc = fileX->Get<TTree>(fileX->Get<TObjString>("metadata/tree")->GetString());
+        in.model = fileData->Get<TObjString>("metadata/model")->GetString();
+        in.scoreBranch = fileData->Get<TObjString>("metadata/score_branch")->GetString();
+        in.mcWeight = fileX->Get<TObjString>("metadata/mc_weight")->GetString();
+        in.classifierPreCut = fileData->Get<TObjString>("metadata/pre_cut")->GetString();
+        in.grid.min = fileData->Get<TObjString>("metadata/score_min")->GetString().Atof();
+        in.grid.max = fileData->Get<TObjString>("metadata/score_max")->GetString().Atof();
     }
-    in.grid.nSteps = TMath::Nint((in.grid.max - in.grid.min) / THRESHOLD_STEP);
-    std::cout << "Reading " << system << " data sample: " << in.dataPath << std::endl;
-    std::cout << "Reading prompt X(3872) MC sample: " << in.mcPath << std::endl;
+    in.grid.nSteps = TMath::Nint((in.grid.max - in.grid.min) / c.thresholdStep);
+    std::cout << "Reading " << in.system << " data sample: " << in.dataPath << std::endl;
+    std::cout << "Reading " << c.inputs.at("signal").label << " sample: " << in.mcPath << std::endl;
 
-    const double mass = X3872_MASS;
-    in.sidebandCut = Form("(Bmass > %.6f && Bmass < %.6f) || (Bmass > %.6f && Bmass < %.6f)",
-                          mass - SIDEBAND_START - SIDEBAND_WIDTH, mass - SIDEBAND_START,
-                          mass + SIDEBAND_START, mass + SIDEBAND_START + SIDEBAND_WIDTH);
+    const double mass = c.peak;
+    const double start = c.punziSidebandStart;
+    const double width = c.punziSidebandWidth;
+    for (int side : c.punziSides)
+        in.sidebandCut += Form("%s(Bmass > %.6f && Bmass < %.6f)", in.sidebandCut.IsNull() ? "" : " || ",
+                               side < 0 ? mass - start - width : mass + start, side < 0 ? mass - start : mass + start + width);
 
-    const std::vector<double>& ptBins = PT_BINS.at(system);
+    const std::vector<double>& ptBins = c.ptBins;
     std::vector<PunziBin> bins;
     const double pMin = ptBins.front();
     const double pMax = ptBins.back();
@@ -395,16 +380,16 @@ void optimalCUT_X_punzi(TString system = "PbPb23", TString classifier = "xgb", T
                 fileTag});
     }
 
-    const TString outDir = Form("%s/optimalCUT/%s/%s_%s", macroDir.Data(), classifier.Data(), system.Data(), fom.Data());
+    const TString outDir = Form("%s/optimalCUT/%s/%s/%s_%s", macroDir.Data(), c.tree.Data(), c.year.Data(), classifier.Data(), fom.Data());
     gSystem->mkdir(outDir, true);
 
     std::cout << "Classifier: " << classifier << ", model " << in.model << std::endl;
     std::cout << Form("Using Punzi FOM = signal_eff / S_min(B), with a = %.1f and b = %.1f", a, b) << std::endl;
     std::cout << "Signal efficiency is weighted with " << in.mcWeight << std::endl;
-    std::cout << Form("Scanning %s from %.2f to %.2f in steps of %.2f", in.scoreBranch.Data(), in.grid.min,
-                      in.grid.max, THRESHOLD_STEP) << std::endl;
-    std::cout << Form("Using X3872 mass = %.5f GeV, signal window = +-%.1f MeV, sidebands = %.1f MeV wide starting at +-%.1f MeV",
-                      X3872_MASS, 1000 * SIGNAL_HALF_WIDTH, 1000 * SIDEBAND_WIDTH, 1000 * SIDEBAND_START) << std::endl;
+    std::cout << Form("Scanning %s from %.2f to %.2f in steps of %g", in.scoreBranch.Data(), in.grid.min,
+                      in.grid.max, c.thresholdStep) << std::endl;
+    std::cout << Form("Using peak mass = %.5f GeV, signal window = +-%.1f MeV, sidebands: %s",
+                      mass, 1000 * c.punziHalfWidth, in.sidebandCut.Data()) << std::endl;
     std::cout << "Using classifier pre-cut: " << in.classifierPreCut << std::endl;
 
     std::vector<PunziResult> results;

@@ -34,12 +34,12 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	TString GRAPH_DIR = Form("%s/Graphs", RESULT_BASE.Data());
 	TString SYST_ROOT_DIR = Form("%s/systematicFILES", ROOT_BASE.Data());
 	TString OUTPLOTF = Form("%s/%s/%s", RESULT_BASE.Data(), TREE.Data(), VAR.Data());
-	gSystem->mkdir(TABLE_DIR.Data(),true); 
-	gSystem->mkdir(GRAPH_DIR.Data(), true); 
+	gSystem->mkdir(TABLE_DIR.Data(),true);
+	gSystem->mkdir(GRAPH_DIR.Data(), true);
 	gSystem->mkdir(ROOT_BASE.Data(), true);
 	gSystem->mkdir(SYST_ROOT_DIR.Data(), true);
-	gSystem->mkdir(Form("%s", OUTPLOTF.Data()),true); 
-	
+	gSystem->mkdir(Form("%s", OUTPLOTF.Data()),true);
+
 	// BINING DEFINITION
 	std::vector<double> _varBINS = VAR_BINS;
 	int _nBins = static_cast<int>(_varBINS.size()) - 1;
@@ -47,14 +47,14 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	// PRINT WHAT IS ABOUT TO HAPPEN //
 	cout << endl << endl;
 	cout << "Variable "<< VAR << endl;
-	cout << "number of bins: " << _nBins << endl;	
+	cout << "number of bins: " << _nBins << endl;
 	cout << TREE << " (" << _nBins << ") " << " BINS: ";
 	for(int t=0; t < _nBins+1 ;t++){cout <<"__"<<  _varBINS[t]<<"__";}
 	cout << endl;
 	//cout << endl << endl;
 	// PRINT WHAT IS ABOUT TO HAPPEN //
 
-	TString SELcuts = Form("%s",CUT.Data()); 
+	TString SELcuts = Form("%s",CUT.Data());
 	cout << "SELECTION cuts = "<< SELcuts << endl;
 	cout << endl << endl;
 
@@ -121,7 +121,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	double resol_vec[_nBins];
 	// FIT INFO
 
-	TH1D* hPt = new TH1D("hPt","",_nBins,_varBINS.data());  
+	TH1D* hPt = new TH1D("hPt","",_nBins,_varBINS.data());
 	TH1D* hPtMC = new TH1D("hPtMC","",_nBins,_varBINS.data());
 
 	//BIN ANALYSIS START
@@ -133,15 +133,15 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		double b_width = _varBINS[i+1]-_varBINS[i];
 
 		//BINNING OF THE DATA
-		RooDataSet* ith_DATA_bin = (RooDataSet*) data->reduce(Form("(abs(%s)>=%f && abs(%s)<=%f)",VAR.Data(),_varBINS[i],VAR.Data(),_varBINS[i+1]));
-		RooDataSet* ith_MC_bin   = (RooDataSet*) mc  ->reduce(Form("(abs(%s)>=%f && abs(%s)<=%f)",VAR.Data(),_varBINS[i],VAR.Data(),_varBINS[i+1]));
+		RooDataSet* ith_DATA_bin = (RooDataSet*) data->reduce(Form("(abs(%s)>=%f && abs(%s)<%f)",VAR.Data(),_varBINS[i],VAR.Data(),_varBINS[i+1]));
+		RooDataSet* ith_MC_bin   = (RooDataSet*) mc  ->reduce(Form("(abs(%s)>=%f && abs(%s)<%f)",VAR.Data(),_varBINS[i],VAR.Data(),_varBINS[i+1]));
 		ith_DATA_bin->SetName(Form("data%d", _count));
 		ith_MC_bin  ->SetName(Form("mc%d"  , _count));
 		cout << "Total DATA entries in "<< i << "-th BIN: " << ith_DATA_bin->numEntries() << "\n";
 		cout << "Total   MC entries in "<< i << "-th BIN: " << ith_MC_bin  ->numEntries() << "\n";
 		//BINNING OF THE DATA
 
-		if(VAR == "Bpt"){var_mean_av[i] = ith_DATA_bin->mean(*pt);}     	
+		if(VAR == "Bpt"){var_mean_av[i] = ith_DATA_bin->mean(*pt);}
 		else if(VAR == "By"){
     		double sumAbs = 0.0;
 			// Loop over the dataset and compute the sum of absolute values
@@ -153,7 +153,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			var_mean_av[i] = sumAbs / ith_DATA_bin->numEntries();
 		}
 		else if(VAR == "nChargedTracks"){var_mean_av[i] = ith_DATA_bin->mean(*nChargedTracks);}
-		
+
 		// for the bin range in the histograms
 		hori_av_low[i]  = var_mean_av[i]-_varBINS[i];
 		hori_av_high[i] = _varBINS[i+1]-var_mean_av[i];
@@ -167,12 +167,12 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		////////// FITFITFITFITFITFITFITFITFITFITFITFIT //////////
 
 
-		// Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results 
+		// Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results
 		// Yield
 			RooRealVar* fitYield = static_cast<RooRealVar*>(f_results->floatParsFinal().at(f_results->floatParsFinal().index(Form("nsig%d_%s",_count,""))));
 
 			yield_vec[i]=fitYield->getVal();
-			yield_Stat_unc[i] = fitYield->getError();	
+			yield_Stat_unc[i] = fitYield->getError();
 			vector<double> stat_un;
 			stat_un.push_back((double) yield_Stat_unc[i]/yield_vec[i]*100);
 
@@ -189,7 +189,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		//chi2 (computed in fit() and stored in workspace)
 		RooRealVar* chi2_data_norm = ws->var(Form("chi2_data_norm%d_%s", _count, ""));
 		chi2_vec[i] = (chi2_data_norm ? chi2_data_norm->getVal() : -1.0);
-		// Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results 
+		// Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results // Get Fit results
 
 		//////////////////////////// FILL YIELD HISTOGRAMS
 		hPt->SetBinContent(i+1,yield_vec[i]/b_width);
@@ -210,10 +210,10 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		TLatex* chi_square = new TLatex(0.68, 0.55, Form("#chi^{2}/ndf = %.2f",chi2_vec[i]));
 		setupLABELS(chi_square);
 
-		// print var bin (& kinmetic info) 
+		// print var bin (& kinmetic info)
 		TLatex* rapidityLabel = new TLatex(0.68, 0.50, "|y| < 2.4");
 		setupLABELS(rapidityLabel);
-		TLatex* varBIN = new TLatex(0.68, 0.45, Form("%.1f < %s < %.1f", (float)_varBINS[i], FitVarLabel(VAR).Data(), (float)_varBINS[i+1]));
+		TLatex* varBIN = new TLatex(0.68, 0.45, Form("%.1f #leq %s < %.1f", (float)_varBINS[i], FitVarLabel(VAR).Data(), (float)_varBINS[i+1]));
 		setupLABELS(varBIN);
 
 		// print Nsig in plot
@@ -250,13 +250,13 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		}
 		// Save
 
-		vector<double> back_variation; 
-		vector<double> back_unc; 
-		vector<double> signal_variation; 
-		vector<double> signal_unc; 
-		vector<double> general_unc; 
-		double max_signal=0.; 
-		double max_back=0.; 
+		vector<double> back_variation;
+		vector<double> back_unc;
+		vector<double> signal_variation;
+		vector<double> signal_unc;
+		vector<double> general_unc;
+		double max_signal=0.;
+		double max_back=0.;
 
 		if(syst_study==1 && FULL==0){
 			//BACKGROUND MODEL SYSTEMATIC STUDY
@@ -305,14 +305,14 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 					variationLabel->Draw();
 					mesonName->Draw();
 					c->Update();
-				
+
 				if (signal[j].code != "fixed") {
-					if(VAR == "By"){ cMC->SaveAs(Form("%s/mc_%s_%s_%0.1f_%0.1f_%s_",OUTPLOTF.Data(),SYSTEM.Data(),Form("abs(%s)",VAR.Data()), (float)_varBINS[i], (float)_varBINS[i+1],signal[j].code.c_str())+TREE+".pdf");} 
+					if(VAR == "By"){ cMC->SaveAs(Form("%s/mc_%s_%s_%0.1f_%0.1f_%s_",OUTPLOTF.Data(),SYSTEM.Data(),Form("abs(%s)",VAR.Data()), (float)_varBINS[i], (float)_varBINS[i+1],signal[j].code.c_str())+TREE+".pdf");}
 					else { cMC->SaveAs(Form("%s/mc_%s_%s_%i_%i_%s_",OUTPLOTF.Data(),SYSTEM.Data(),VAR.Data(), (int)_varBINS[i], (int)_varBINS[i+1],signal[j].code.c_str() )+TREE+".pdf");}
 				}
 				if(VAR == "By"){ c->SaveAs(Form("%s/data_%s_%s_%0.1f_%0.1f_%s_",OUTPLOTF.Data(),SYSTEM.Data(),Form("abs(%s)",VAR.Data()),(float)_varBINS[i],(float)_varBINS[i+1],signal[j].code.c_str() )+TREE+".pdf");}
 				else{ c->SaveAs(Form("%s/data_%s_%s_%i_%i_%s_",OUTPLOTF.Data(),SYSTEM.Data(),VAR.Data(),(int)_varBINS[i],(int)_varBINS[i+1],signal[j].code.c_str() )+TREE+".pdf");}
-				
+
 				signal_variation.push_back(fitYield_signal->getVal());
 				double signal_rel_unc = (yield_vec[i] != 0.) ? abs(((yield_vec[i]-fitYield_signal->getVal())/yield_vec[i])*100.) : 0.;
 				signal_unc.push_back(signal_rel_unc);
@@ -324,7 +324,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			general_unc.push_back(sqrt(max_back*max_back+max_signal*max_signal));
 			stat_error.push_back(stat_un);
 			back_syst_rel_values.push_back(back_unc);
-			sig_syst_rel_values.push_back(signal_unc);			
+			sig_syst_rel_values.push_back(signal_unc);
 			general_syst.push_back(general_unc);
 			yield_vec_systerr_low[i] = general_unc[2] / 100 * yield_vec[i];
 			yield_vec_systerr_high[i] = general_unc[2] / 100 * yield_vec[i];
@@ -333,7 +333,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	}
 	//BIN ANALYSIS END
 	//BIN ANALYSIS END
-	
+
 	// FULL=1 writes the inclusive model used by validation.
 	// FULL=0 writes the analysis-bin model used by the Acc x Eff application.
 	TString fitFileName = FULL==1
@@ -349,7 +349,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 	inputMCStr.Write("inputMC");
 	TObjString inputDataStr(INPUTDATA);
 	inputDataStr.Write("inputData");
-	TObjString mcWeightStr((TREE == "ntmix_X3872" || TREE == "ntmix_PSI2S") ? "pThatreweight" : "none");
+	TObjString mcWeightStr("pThatreweight");
 	mcWeightStr.Write("mcWeight");
 	TObjString fitModeStr(FULL==1 ? "inclusive" : "binned");
 	fitModeStr.Write("fitMode");
@@ -394,7 +394,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			col_name_general.push_back(label1);
 		}
 		WriteSystematicsTablesDocument(
-			string(TABLE_DIR.Data()) + "/systematics_tables_" + string(VAR.Data()) + "_" + string(TREE.Data()),
+			string(TABLE_DIR.Data()) + "/systematics_tables_" + string(TREE.Data()) + "_" + string(SYSTEM.Data()) + "_" + string(VAR.Data()),
 			col_name_signal, col_name_back, col_name_general, labels_signal, labels_back, labels_general, sig_syst_rel_values,
 			back_syst_rel_values, BuildGeneralSystematicNumbers(general_syst, stat_error)
 		);
@@ -476,7 +476,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_back->GetXaxis()->SetLimits(0,110);
 		}
 		legback->Draw();
-		c_back->SaveAs(Form("%s/background_systematics_plot_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()));
+		c_back->SaveAs(Form("%s/background_systematics_plot_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data()));
 
 		TCanvas* c_sig= new TCanvas("c_sig","",700,700);
 		TLegend *legsig = new TLegend(0.75,0.8,0.89,0.89,NULL,"brNDC");
@@ -522,7 +522,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_sig->GetXaxis()->SetLimits(0,110);
 		}
 		legsig->Draw();
-		c_sig->SaveAs(Form("%s/signal_systematics_plot_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()));
+		c_sig->SaveAs(Form("%s/signal_systematics_plot_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data()));
 
 		TCanvas *c_sig_back= new TCanvas("c_sig_back","",700,700);
 		double y_max_combined = (y_max_back > y_max_sig) ? y_max_back : y_max_sig;
@@ -543,7 +543,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		m_back_sig->GetYaxis()->SetTitle("Systematic Uncertainty(%)");
 		m_back_sig->Draw("AE1");
 		legsigback->Draw();
-		c_sig_back->SaveAs(Form("%s/background_signal_systematics_plot_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()));
+		c_sig_back->SaveAs(Form("%s/background_signal_systematics_plot_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data()));
 
 		TCanvas* c_gen= new TCanvas("c_gen","",700,700);
 		TLegend *legen = new TLegend(0.8,0.77,0.89,0.89,NULL,"brNDC");
@@ -598,7 +598,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			m_gen->GetXaxis()->SetLimits(0,110);
 		}
 		legen->Draw();
-		c_gen->SaveAs(Form("%s/general_systematics_plot_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()));
+		c_gen->SaveAs(Form("%s/general_systematics_plot_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data()));
 
 	}
 
@@ -658,7 +658,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		leg_d->SetTextFont(42);
 		leg_d->SetTextSize(0.035);
 		leg_d->Draw();
-		const char* pathc =Form("%s/raw_yield_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data());
+		const char* pathc =Form("%s/raw_yield_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data());
 		c_diff.SaveAs(pathc);
 		//Differential plot part ends
 
@@ -681,7 +681,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			mg_par->GetXaxis()->SetLimits(0 ,2.4);
 		} else if(VAR == "Bpt"){
 			mg_par->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
-			mg_par->GetXaxis()->SetLimits(0 ,80); 
+			mg_par->GetXaxis()->SetLimits(0 ,80);
 		} else if(VAR == "nChargedTracks"){
 			mg_par->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			mg_par->GetXaxis()->SetLimits(0, 110);
@@ -690,7 +690,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		mg_par->Add(gr_scale,"PE");
 		mg_par->GetYaxis()->SetRangeUser(0,scale_max*1.4);
 		mg_par->Draw("AP");
-		const char* pathc_par =Form("%s/scale_variation_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()); 
+		const char* pathc_par =Form("%s/scale_variation_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data());
 		c_par.SaveAs(pathc_par);
 		//Scale part ends
 
@@ -712,7 +712,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			mg_resol->GetXaxis()->SetLimits(0 ,2.4);
 		} else if(VAR == "Bpt"){
 			mg_resol->GetXaxis()->SetTitle("Transverse Momentum (p_{T})");
-			mg_resol->GetXaxis()->SetLimits(0, 100); 
+			mg_resol->GetXaxis()->SetLimits(0, 100);
 		} else if(VAR == "nChargedTracks"){
 			mg_resol->GetXaxis()->SetTitle("Multiplicity (Mult)");
 			mg_resol->GetXaxis()->SetLimits(0, 110);
@@ -720,7 +720,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 		mg_resol->GetYaxis()->SetRangeUser(0,(resol_max > 0. ? resol_max*1.4 : 0.2));
 		mg_resol->Add(gr_resol,"PE");
 		mg_resol->Draw("AP");
-		const char* pathc_resol =Form("%s/resolution_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()); 
+		const char* pathc_resol =Form("%s/resolution_%s_%s_%s.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data());
 		c_resol.SaveAs(pathc_resol);
 		//Resolution plot part ends
 
@@ -734,7 +734,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			//chi2 plot part (sigsum) starts
 			TCanvas c_chi2_sigsum;
 			TMultiGraph* mg_chi2_sigsum = new TMultiGraph();
-			TLegend *leg_chi2_sigsum = new TLegend(0.68,0.78,0.92,0.90,NULL,"brNDC"); 
+			TLegend *leg_chi2_sigsum = new TLegend(0.68,0.78,0.92,0.90,NULL,"brNDC");
 			if(TREE == "ntmix_X3872" || TREE == "ntmix_PSI2S") leg_chi2_sigsum = new TLegend(0.68,0.72,0.92,0.90,NULL,"brNDC");
 			double chi2_max_sigsum = 0;
 
@@ -766,14 +766,14 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			leg_chi2_sigsum->SetTextSize(0.035);
 			leg_chi2_sigsum->Draw();
 
-			const char* pathc_chi2_sigsum =Form("%s/chi2_%s_%s_signal_summary.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()); 
+			const char* pathc_chi2_sigsum =Form("%s/chi2_%s_%s_%s_signal_summary.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data());
 			c_chi2_sigsum.SaveAs(pathc_chi2_sigsum);
 			//chi2 plot part (sigsum) ends
 
 			//chi2 plot part (backsum) starts
 			TCanvas c_chi2_backsum;
 			TMultiGraph* mg_chi2_backsum = new TMultiGraph();
-			TLegend *leg_chi2_backsum = new TLegend(0.68,0.78,0.92,0.90,NULL,"brNDC"); 
+			TLegend *leg_chi2_backsum = new TLegend(0.68,0.78,0.92,0.90,NULL,"brNDC");
 			if(TREE == "ntmix_X3872" || TREE == "ntmix_PSI2S") leg_chi2_backsum = new TLegend(0.68,0.72,0.92,0.90,NULL,"brNDC");
 			double chi2_max_backsum = 0;
 
@@ -806,7 +806,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 			leg_chi2_backsum->SetTextSize(0.035);
 			leg_chi2_backsum->Draw();
 
-			const char* pathc_chi2_backsum =Form("%s/chi2_%s_%s_background_summary.pdf", GRAPH_DIR.Data(), TREE.Data(), VAR.Data()); 
+			const char* pathc_chi2_backsum =Form("%s/chi2_%s_%s_%s_background_summary.pdf", GRAPH_DIR.Data(), TREE.Data(), SYSTEM.Data(), VAR.Data());
 			c_chi2_backsum.SaveAs(pathc_chi2_backsum);
 			//chi2 plot part (backsum) ends
 		}
@@ -823,7 +823,7 @@ void roofitB(TString TREE = "ntphi", int FULL = 0, TString INPUTDATA = "", TStri
 
 
 void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString treeName, TString sample, TString colsys, TString DOselCUTS){
-	
+
 	cout << "Reading " <<  colsys.Data() << " " << treeName.Data() << " " << sample.Data() << " samples" << endl;
 	cout << "at: " << fName.Data() << endl;
 
@@ -834,18 +834,18 @@ void read_samples(RooWorkspace& w, vector<TString> label, TString fName, TString
 	TString fullCut = Form("(%s) && (Bmass > %f) && (Bmass < %f)", DOselCUTS.Data(), minhisto, maxhisto);
 
 	TDirectory* savedDir = gDirectory;
-	gROOT->cd();                 
+	gROOT->cd();
 	TTree* t1 = tIn->CopyTree(fullCut);
-	savedDir->cd();              
+	savedDir->cd();
 
-	// Get the variables	
+	// Get the variables
 	RooArgList arg_list("arg_list");
 	arg_list.add(*(w.var("Bmass")));
 	for(auto lab : label){arg_list.add(*(w.var(lab)));}
-	if (sample == "mc" && (treeName == "ntmix_X3872" || treeName == "ntmix_PSI2S")) {
+	if (sample == "mc") {
 		arg_list.add(*(w.var("pThatreweight")));
 	}
-	RooDataSet* data_s = sample == "mc" && (treeName == "ntmix_X3872" || treeName == "ntmix_PSI2S")
+	RooDataSet* data_s = sample == "mc"
 		? new RooDataSet(sample, sample, t1, arg_list, "", "pThatreweight")
 		: new RooDataSet(sample, sample, t1, arg_list);
 	w.import(*data_s);

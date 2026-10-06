@@ -129,7 +129,7 @@ void plot_nonPrompt_fraction(TString systemNAME = "ppRef", bool inclusiveOnly = 
 			    << fracPsi[b]->GetBinContent(i) << " " << fracPsi[b]->GetBinError(i) << " "
 			    << effX[b]->GetBinContent(i) << " "
 			    << fracX[b]->GetBinContent(i) << " " << fracX[b]->GetBinError(i) << "\n";
-			printf("  [%g, %g]: psi2S = %.4f +/- %.4f, X3872 = %.4f +/- %.4f\n", low, high,
+			printf("  [%g, %g): psi2S = %.4f +/- %.4f, X3872 = %.4f +/- %.4f\n", low, high,
 			       fracPsi[b]->GetBinContent(i), fracPsi[b]->GetBinError(i),
 			       fracX[b]->GetBinContent(i), fracX[b]->GetBinError(i));
 		}

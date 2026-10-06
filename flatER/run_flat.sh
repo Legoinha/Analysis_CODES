@@ -9,17 +9,13 @@ FILELIST_DIR="${SCRIPT_DIR}/filelists"
 MC_NORM_FILE="${SCRIPT_DIR}/config/mc_normalization.csv"
 REWEIGHT_PLOT_DIR="${SCRIPT_DIR}/reweighting_comparisons"
 
-SYSTEM="${1:?missing SYSTEM}"
-KIND="${2:?missing KIND}"
-TREE="${3:?missing TREE}"
+SYSTEM="$1"
+KIND="$2"
+TREE="$3"
 PARTICLE="${4:-}"
 PVSNP="${5:-}"
 
 FILELIST_SUBDIR="${FILELIST_DIR}/${KIND}"
-if [[ "${KIND}" == "MC" && ! -r "${MC_NORM_FILE}" ]]; then
-  echo "Missing MC normalization table: ${MC_NORM_FILE}" >&2
-  exit 1
-fi
 
 CASETAG="${PARTICLE}${PVSNP}"
 SHARING_DIR="/eos/user/h/hmarques/RUN3_Data_MC_sharing"
@@ -73,11 +69,6 @@ done < <(find "${FILELIST_SUBDIR}" -type f -name '*.txt' | sort)
 
 cd "${SCRIPT_DIR}"
 
-if [[ "${#MATCHED_LISTS[@]}" -eq 0 ]]; then
-  echo "No matching filelists found in ${FILELIST_SUBDIR} for SYSTEM=${SYSTEM} KIND=${KIND} TREE=${TREE} PARTICLE=${PARTICLE} PVSNP=${PVSNP}" >&2
-  exit 1
-fi
-
 # MC: flatten all matched lists in one run. The pThat weights need n_gen of every
 # pThat sample of the group, counted over all of its files.
 COMBINED_LIST=""
@@ -98,10 +89,6 @@ for idx in "${!MATCHED_LISTS[@]}"; do
   # finished so every ROOT key remains readable at the path where it was made.
   rm -f "${OUTPUT_CHUNK_PATH}"
   root -l -b -q "${MACRO_NAME}(\"${FILELIST}\",\"${NUN}\",\"${TREE}\",\"${SYSTEM}\",\"${KIND}\",\"${PARTICLE}\",\"${PVSNP}\",\"${MC_NORM_FILE}\")"
-  if [[ ! -s "${OUTPUT_CHUNK_PATH}" ]]; then
-    echo "Flattener did not create a non-empty chunk: ${OUTPUT_CHUNK_PATH}" >&2
-    exit 1
-  fi
   INDEXED_OUTPUTS+=("${OUTPUT_CHUNK_PATH}")
 done
 

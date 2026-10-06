@@ -23,15 +23,16 @@
 
 #include "aux/plot.h"
 
-// This closure opens only the MC binned-fit companion and raw MC maps.
-// All ntmix_* candidates in ws_mc are selected and generator matched already.
+// This closure opens only the MC binned-fit companion of the year and the raw MC maps.
+// All candidates in ws_mc are selected and generator matched already.
 //
 // root -l -b -q 'Closure_methods.C("ntmix_PSI2S","PbPb23","Bpt")'
+// root -l -b -q 'Closure_methods.C("ntKp","PbPb24","Bpt")'
 void Closure_methods(TString treename = "ntmix_X3872",
                      TString SYSTEM = "ppRef",
                      TString VAR = "Bpt")
 {
-    const TString outputDir = "output/" + SYSTEM;
+    const TString outputDir = Form("output/%s/%s", treename.Data(), SYSTEM.Data());
     const TString closureDir = outputDir + "/closure";
     const TString rootDir = outputDir + "/ROOTs";
     gSystem->mkdir(closureDir, true);
@@ -44,18 +45,16 @@ void Closure_methods(TString treename = "ntmix_X3872",
     if (VAR == "nChargedTracks") axisTitle = "N_{trk}";
     if (VAR == "CentBin") axisTitle = "Centrality (%)";
 
-    double signalWindow = 0.0;
-    if (treename == "ntmix_X3872") signalWindow = 0.020;
-    if (treename == "ntmix_PSI2S") signalWindow = 0.015;
+    const double signalWindow = GetAccEffSetup(treename, SYSTEM).window;
 
     std::unique_ptr<TFile> map0DFile(TFile::Open(Form(
-        "%s/ROOTs/%s_%s0Dmap_ACCxEFF_raw.root",
+        "%s/ROOTs/%s_%s_0Dmap_ACCxEFF_raw.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data()), "READ"));
     std::unique_ptr<TFile> map1DFile(TFile::Open(Form(
-        "%s/ROOTs/%s_%s1Dmap_ACCxEFF_raw.root",
+        "%s/ROOTs/%s_%s_1Dmap_ACCxEFF_raw.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data()), "READ"));
     std::unique_ptr<TFile> map2DFile(TFile::Open(Form(
-        "%s/ROOTs/%s_%s2Dmap_ACCxEFF_raw.root",
+        "%s/ROOTs/%s_%s_2Dmap_ACCxEFF_raw.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data()), "READ"));
     TH1D* map0D = static_cast<TH1D*>(map0DFile->Get("hACCxEFF"));
     TH1D* map1D = static_cast<TH1D*>(map1DFile->Get("hACCxEFF"));
@@ -414,9 +413,9 @@ void Closure_methods(TString treename = "ntmix_X3872",
     fittedSignal.Write();
     signalSWeight.Write();
     TNamed("closureDefinition",
-           "MC only: selected generator-matched ntmix signal candidates").Write();
+           "MC only: selected generator-matched signal candidates").Write();
     TNamed("genMatchingDefinition",
-           "implicit in ntmix_X3872 and ntmix_PSI2S; no additional matching cut").Write();
+           "implicit in the signal MC trees; no additional matching cut").Write();
     TNamed("selectionCut", recoSelection.Data()).Write();
     TNamed("inputMC", mcPath.Data()).Write();
     TNamed("mcFitFile", mcFitPath.Data()).Write();

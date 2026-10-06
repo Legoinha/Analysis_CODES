@@ -57,9 +57,10 @@ Important details:
 
 ## MC pThat normalization
 
-MC flattening reads `config/mc_normalization.csv` and adds two branches to both the
+MC flattening reads `config/mc_normalization.csv` and adds three branches to both the
 flattened reconstructed tree and `ntGen`: `pthat`, the generator pThat copied from the
-forest, and `pThatreweight`, the event weight.
+forest, `pThatreweight`, the event weight, and `pThats` (Int_t), the pThat threshold of the
+campaign the event comes from (5, 10, 15, 30 or 50: every event of a campaign at its value).
 
 The MC productions are inclusive: the sample `pThat-X` contains every event with
 pThat > X. The samples therefore overlap, and an event with generator pThat `p` can
@@ -86,6 +87,10 @@ This needs forests made with the Bfinder version that stores `pthat` in `ntmix` 
 The value is stored, not automatically multiplied into the other branches.
 Downstream histograms or fits should use `pThatreweight` explicitly.
 
+`pThats` selects campaigns: `pThats != 5` leaves out the pThat-5 campaign. `pThatreweight`
+still includes that campaign's luminosity in the sum, so after such a cut the exact weight is
+`1 / sum_{X_j < p, j kept} L_j`, which the flattening log gives per campaign (`L=`).
+
 The normalization table columns are:
 
 ```text
@@ -93,18 +98,19 @@ system,tree,particle,promptness,pthat,path_pattern,xsec_pb,filter_eff
 ```
 
 `pthat` is the generation threshold X of the campaign. `n_gen` is not in the table:
-`Flat_TREEs.C` assigns every input file to its campaign by `path_pattern` (exactly one
-row of the group must match its path) and counts `n_gen` as the number of
+`Flat_TREEs.C` assigns every input file to the first row of the group whose `path_pattern`
+is in its path (case-insensitive; a file matching no row stops it with `std::out_of_range`)
+and counts `n_gen` as the number of
 Bfinder/ntGen events in the files of that campaign. The log prints the files and
 `n_gen` found per campaign. A campaign without input files has `n_gen = 0` and adds no
 luminosity. Because the weight sums over all campaigns of a group, `run_flat.sh` joins
 all matched MC file lists into one flattening run. To enable PbPb24 or another system,
 add its rows to the same CSV. Data flattening neither reads this table nor creates the
-two branches.
+three branches.
 
-The flattener stops with an error when an MC input file has no `pthat` branch or a
-branch that is not `Float_t`. Without this check ROOT would only print an error and
-leave `pthat = 0`, giving every event the weight of the lowest pThat campaign.
+An MC input file without a `pthat` branch makes ROOT print an error at `SetBranchAddress`
+and leaves `pthat = 0`, which gives every event the weight of the lowest pThat campaign: read
+the start of the flattening log.
 
 ## Reweighting comparison plots
 

@@ -5,7 +5,9 @@
 #include <TH1D.h>
 #include <TMath.h>
 #include <vector>
+#include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 struct VarCfgSignal {
     TString expr;
@@ -33,12 +35,6 @@ struct ReweightInput {
 
 static constexpr int kNBins = 10;
 
-static TString normalizeWeightTag(TString tag)
-{
-    tag = tag.Strip(TString::kBoth);
-    if (tag.BeginsWith("hWeight_")) tag.Remove(0, TString("hWeight_").Length());
-    return tag;
-}
 
 static TString validationWeightExpression(const VarCfgSignal& var)
 {
@@ -48,17 +44,17 @@ static TString validationWeightExpression(const VarCfgSignal& var)
 static double lookupWeight1D(const TH1D* hist, double value)
 {
     const int bin = hist->GetXaxis()->FindBin(value);
-    if (bin < 1 || bin > hist->GetNbinsX()) return 1.0;
     return hist->GetBinContent(bin);
 }
 
 
-static std::vector<VarCfgSignal> getSignalVars(TString treeName, TString systemTag = "")
+static std::vector<VarCfgSignal> getSignalVars(TString treeName, TString systemTag,
+                                                TString fitVariable,
+                                                double fitVariableMin, double fitVariableMax)
 {
     std::vector<VarCfgSignal> vars = {
-        {"Bpt", ";p_{T} [GeV/c];", kNBins, 10, 50.0, false},
         {"By", ";|y|;", kNBins, 0.0, 1.6, true},
-        {"Score", ";Score;", kNBins, 0.8, 1.0, false},
+        {"Prediction", ";Classifier score;", kNBins, 0.0, 1.0, false},  // from the score cut to 1 (DataSIGNAL_VS_MC.C)
         {"Bchi2Prob", ";Bchi2Prob;", kNBins, 0.0, 1.0, false},
         {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, .3, false},
         {"Btrk2dR", ";Btrk2dR;", kNBins, 0.0, .3, false},
@@ -116,26 +112,27 @@ static std::vector<VarCfgSignal> getSignalVars(TString treeName, TString systemT
 
     if (treeName == "ntKp") {
         vars = {
-            {"Bpt", ";p_{T} [GeV/c];", kNBins, 7.5, 60.0, false},
             {"By", ";|y|;", kNBins, 0.0, 2.4, true},
-            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 2, false},
+            {"Prediction", ";Classifier score;", kNBins, 0.0, 1.0, false},  // from the score cut to 1 (DataSIGNAL_VS_MC.C)
+            {"Bchi2Prob", ";Bchi2Prob;", kNBins, 0.0, 1.0, false},
+            {"Btrk1dR", ";Btrk1dR;", kNBins, 0.0, 1.5, false},
             {"Btrk1Dz1", ";Btrk1Dz1;", kNBins, -0.5, 0.5, false},
-            {"Bnorm_trk1Dz", ";Bnorm_trk1Dz;", kNBins, -5.0, 5.0, false},
+            {"Bnorm_trk1Dz", ";Bnorm_trk1Dz;", kNBins, -20.0, 20.0, false},
             {"Bmu1phi", ";Bmu1phi;", kNBins, -3.2, 3.2, false},
             {"Btrk1Eta", ";Btrk1Eta;", kNBins, -2.4, 2.4, false},
             {"Btrk1Phi", ";Btrk1Phi;", kNBins, -3.2, 3.2, false},
             {"Bmu1pt", ";Bmu1pt;", kNBins, 0.0, 25.0, false},
             {"Bujmass", ";Bujmass [GeV/c^{2}];", kNBins, 2.9, 3.3, false},
-            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 40.0, false},
-            {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.40, false},
-            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -10.0, 10.0, false},
+            {"Bnorm_svpvDistance_2D", ";Bnorm_svpvDistance_2D;", kNBins, 0.0, 50.0, false},
+            {"BsvpvDistance_2D", ";BsvpvDistance_2D;", kNBins, 0.0, 0.5, false},
+            {"Bnorm_trk1Dxy", ";Bnorm_trk1Dxy;", kNBins, -25.0, 25.0, false},
             {"Balpha", ";Balpha;", kNBins, 0.0, 1.0, false},
             {"Bcos_dtheta", ";Bcos_dtheta;", kNBins, 0.995, 1.0, false},
-            {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 10.0, false},
+            {"Btrk1Pt", ";Btrk1Pt;", kNBins, 0.0, 15.0, false},
             {"Bujpt", ";Bujpt;", kNBins, 0.0, 50.0, false},
             {"Bujeta", ";Bujeta;", kNBins, -2.4, 2.4, false},
             {"Bujphi", ";Bujphi;", kNBins, -3.2, 3.2, false},
-            {"Bujlxy", ";Bujlxy;", kNBins, -0.1, 0.1, false}
+            {"Bujlxy", ";Bujlxy;", kNBins, 0.0, 0.5, false}
         };
     }
 
@@ -157,20 +154,39 @@ static std::vector<VarCfgSignal> getSignalVars(TString treeName, TString systemT
 
     if (systemTag.BeginsWith("PbPb")) {
         for (auto& v : vars) {
-            if (v.expr == "Bpt") {
-                v.xmin = 15.0;
-                v.xmax = 50.0;
-            }
-            if (v.expr == "By") {
+            if (v.expr == "By" && treeName.BeginsWith("ntmix")) {
                 v.xmin = 0.0;
                 v.xmax = 1.6;
             }
-            if (v.expr == "Score") {
-                v.xmin = 0.85;
-                v.xmax = 1.0;
-            }
         }
     }
+
+    const bool isBMeson = treeName == "ntKp" || treeName == "ntphi" || treeName == "ntKstar";
+    if (isBMeson) {
+        for (auto& v : vars) {
+            if (v.expr == "Bchi2Prob") { v.xmin = 0.0; v.xmax = 1.0; }
+            if (v.expr == "Bdoubletpt") { v.xmin = 0.0; v.xmax = 15.0; }
+            if (v.expr == "Bnorm_svpvDistance_2D") { v.xmin = 0.0; v.xmax = 50.0; }
+            if (v.expr == "BsvpvDistance_2D") { v.xmin = 0.0; v.xmax = 0.5; }
+            if (v.expr == "Bnorm_trk1Dxy" || v.expr == "Bnorm_trk2Dxy") {
+                v.xmin = -25.0; v.xmax = 25.0;
+            }
+            if (v.expr == "Bnorm_trk1Dz" || v.expr == "Bnorm_trk2Dz") {
+                v.xmin = -20.0; v.xmax = 20.0;
+            }
+            if (v.expr == "Btrk1dR" || v.expr == "Btrk2dR") { v.xmin = 0.0; v.xmax = 1.5; }
+            if (v.expr == "Btrk1Pt" || v.expr == "Btrk2Pt") { v.xmin = 0.0; v.xmax = 15.0; }
+            if (v.expr == "Bujlxy") { v.xmin = 0.0; v.xmax = 0.5; }
+        }
+    }
+    vars.erase(std::remove_if(vars.begin(), vars.end(), [&](const VarCfgSignal& var) {
+        return var.expr == fitVariable;
+    }), vars.end());
+    const TString fitAxisTitle = fitVariable == "Bpt"
+        ? ";p_{T} [GeV/c];" : Form(";%s;", fitVariable.Data());
+    vars.insert(vars.begin(), {fitVariable, fitAxisTitle, kNBins,
+                              fitVariableMin, fitVariableMax, fitVariable == "By"});
+
     return vars;
 }
 
@@ -181,19 +197,24 @@ static TH1D* makeWeightHist(const TH1D* hData, const TH1D* hMC, const TString& n
     hWeight->SetTitle(hData->GetTitle());
     hWeight->GetXaxis()->SetTitle(hData->GetXaxis()->GetTitle());
     hWeight->GetYaxis()->SetTitle("Data / MC");
-    for (int i = 1; i <= hWeight->GetNbinsX(); ++i) {
+    for (int i = 0; i <= hWeight->GetNbinsX() + 1; ++i) {
         const double data = hData->GetBinContent(i);
         const double mc = hMC->GetBinContent(i);
         const double dataErr = hData->GetBinError(i);
         const double mcErr = hMC->GetBinError(i);
-        double ratio = 1.0;
-        double ratioErr = 0.0;
-        if (mc != 0.0) {
-            ratio = data / mc;
-            const double relData = (data != 0.0) ? dataErr / std::abs(data) : 0.0;
-            const double relMC = mcErr / std::abs(mc);
-            ratioErr = std::abs(ratio) * sqrt(relData * relData + relMC * relMC);
+        // No MC candidate falls in an empty MC bin, so its weight is never applied: it is 0, whatever the data.
+        if (mc == 0.0) {
+            if (data != 0.0) {
+                std::cerr << "[validation] WARNING: " << name << " bin " << i << ": MC is empty while data is "
+                          << data << " +- " << dataErr << "; weight set to 0" << std::endl;
+            }
+            hWeight->SetBinContent(i, 0.0);
+            hWeight->SetBinError(i, 0.0);
+            continue;
         }
+        const double ratio = data / mc;
+        const double ratioErr = std::sqrt(std::pow(dataErr / mc, 2) +
+                                          std::pow(data * mcErr / (mc * mc), 2));
         hWeight->SetBinContent(i, ratio);
         hWeight->SetBinError(i, ratioErr);
     }

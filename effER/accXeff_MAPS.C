@@ -17,61 +17,30 @@
 #include <memory>
 #include <vector>
 
-// One call writes one exact (dimension, efficiency-weight) map.
-// The binned Bpt fit provides the input MC, reconstructed selection, and the
-// analysis bins used by the 0D Nsel/Nacc map. Every MC count uses pThatreweight.
+#include "aux/uti.h"
+
+// One call writes one exact (dimension, efficiency-weight) map of one tree in one year.
+// The binned Bpt fit of the year (../fitER/ROOTfiles/<YEAR>/) provides the input MC, the reconstructed
+// selection, and the analysis bins used by the 0D Nsel/Nacc map. The input MC is a scored sample (selectionER),
+// which holds only the reconstructed tree: the generator tree comes from the flat file its metadata names
+// (input_file). Every MC count uses pThatreweight.
 //
 // root -l -b -q 'accXeff_MAPS.C("ntmix_PSI2S","PbPb23","2D","raw")'
 // root -l -b -q 'accXeff_MAPS.C("ntmix_PSI2S","PbPb23","2D","Bpt")'
-// root -l -b -q 'accXeff_MAPS.C("ntmix_PSI2S","PbPb23","2D","Score")'
+// root -l -b -q 'accXeff_MAPS.C("ntKp","PbPb24","2D","raw")'
 void accXeff_MAPS(TString treename = "ntmix_X3872",
                   TString SYSTEM = "ppRef",
                   TString DIMENSION = "2D",
                   TString WEIGHT = "raw")
 {
-    TString particleTag;
-    TString particleLabel;
-    if (treename == "ntmix_X3872") {
-        particleTag = "X3872";
-        particleLabel = "X(3872)";
-    }
-    if (treename == "ntmix_PSI2S") {
-        particleTag = "PSI2S";
-        particleLabel = "#psi(2S)";
-    }
+    const AccEffSetup setup = GetAccEffSetup(treename, SYSTEM);
+    const TString particleLabel = FitParticleLabel(treename);
+    const double ptMin = setup.map.ptBins.front();
+    const double ptMax = setup.map.ptBins.back();
+    const std::vector<double>& ptBins = setup.map.ptBins;
+    const std::vector<double>& yBins = setup.map.yBins;
 
-    double ptMin = 0.0;
-    double ptMax = 0.0;
-    double absYMax = 0.0;
-    double trackPtMin = 0.0;
-    std::vector<double> ptBins;
-    std::vector<double> yBins;
-    if (SYSTEM == "ppRef") {
-        ptMin = 7.5;
-        ptMax = 50.0;
-        absYMax = 2.4;
-        trackPtMin = 0.5;
-        ptBins = {
-            7.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15,
-            15.5, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5, 21,
-            21.5, 22, 22.5, 23, 23.5, 24, 24.5, 25, 26, 27, 28, 29, 30,
-            32, 34, 36, 38, 40, 45, 50
-        };
-        yBins = {0.0, 0.6, 1.2, 1.6, 2.0, 2.4};
-    }
-    if (SYSTEM == "PbPb23") {
-        ptMin = 15.0;
-        ptMax = 50.0;
-        absYMax = 1.6;
-        trackPtMin = 0.9;
-        ptBins = {
-            15, 25, 26, 27, 28, 29,
-            30, 32, 34, 36, 38, 40, 42, 44, 46, 50
-        };
-        yBins = {0.0, 0.8, 1.6};
-    }
-
-    const TString outputDir = "output/" + SYSTEM;
+    const TString outputDir = Form("output/%s/%s", treename.Data(), SYSTEM.Data());
     gSystem->mkdir(outputDir + "/2Dmaps", true);
     gSystem->mkdir(outputDir + "/ROOTs", true);
     gStyle->SetOptStat(0);
@@ -96,7 +65,10 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
 
     std::unique_ptr<TFile> input(TFile::Open(mcPath, "READ"));
     TTree* recoTree = static_cast<TTree*>(input->Get(treename));
-    TTree* genTree = static_cast<TTree*>(input->Get("ntGen"));
+    const TString genPath =
+        static_cast<TObjString*>(input->Get("metadata/input_file"))->GetString();
+    std::unique_ptr<TFile> genInput(TFile::Open(genPath, "READ"));
+    TTree* genTree = static_cast<TTree*>(genInput->Get("ntGen"));
 
     TString weightPath = "none";
     TString recoWeightExpression = "none";
@@ -104,8 +76,8 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
     TH1D* validationWeight = nullptr;
     if (WEIGHT != "raw") {
         weightPath = Form(
-            "../plotER/Validation/WEIGHTS/ntmix_%s_%s_weight.root",
-            SYSTEM.Data(), particleTag.Data());
+            "../plotER/Validation/WEIGHTS/%s_%s_%s_weight.root",
+            setup.dataTree.Data(), SYSTEM.Data(), setup.particleTag.Data());
         weightFile.reset(TFile::Open(weightPath, "READ"));
         validationWeight = static_cast<TH1D*>(
             weightFile->Get(Form("hWeight_%s", WEIGHT.Data())));
@@ -120,13 +92,14 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
         "((Gmu2pt >= 3.5 && abs(Gmu2eta) < 1.2) || "
         "(Gmu2pt >= 5.47 - 1.89*abs(Gmu2eta) && abs(Gmu2eta) >= 1.2 && abs(Gmu2eta) < 2.1) || "
         "(Gmu2pt >= 1.5 && abs(Gmu2eta) >= 2.1 && abs(Gmu2eta) < 2.4)))";
-    const TString trackAcceptance = Form(
-        "(Gtk1pt > %g && abs(Gtk1eta) < 2.4 && "
-        "Gtk2pt > %g && abs(Gtk2eta) < 2.4)",
-        trackPtMin, trackPtMin);
+    const TString trackAcceptance = setup.nTracks == 1
+        ? Form("(Gtk1pt > %g && abs(Gtk1eta) < 2.4)", setup.trackPtMin)
+        : Form("(Gtk1pt > %g && abs(Gtk1eta) < 2.4 && "
+               "Gtk2pt > %g && abs(Gtk2eta) < 2.4)",
+               setup.trackPtMin, setup.trackPtMin);
     const TString genCut = Form(
         "(Gpt > %g && Gpt < %g && abs(Gy) < %g)",
-        ptMin, ptMax, absYMax);
+        ptMin, ptMax, setup.map.absYMax);
     const TString accCut =
         "(" + genCut + " && " + muonAcceptance + " && " + trackAcceptance + ")";
 
@@ -237,7 +210,7 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
         recoPThatFormula.GetNdata();
         const double recoPt = recoPtFormula.EvalInstance();
         const double recoAbsY = std::abs(recoYFormula.EvalInstance());
-        if (recoAbsY >= absYMax) continue;
+        if (recoAbsY >= setup.map.absYMax) continue;
         double weight = recoPThatFormula.EvalInstance();
         if (variableWeightFormula) {
             variableWeightFormula->GetNdata();
@@ -321,7 +294,7 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
     }
 
     TFile acceptanceOutput(Form(
-        "%s/ROOTs/%s_%s%smap_ACC.root",
+        "%s/ROOTs/%s_%s_%smap_ACC.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data(), DIMENSION.Data()),
         "RECREATE");
     hAcc->Write();
@@ -330,13 +303,14 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
     TNamed("mapDimension", DIMENSION.Data()).Write();
     TNamed("system", SYSTEM.Data()).Write();
     TNamed("inputMC", mcPath.Data()).Write();
+    TNamed("generatorInputMC", genPath.Data()).Write();
     TNamed("generatorCut", genCut.Data()).Write();
     TNamed("acceptanceCut", accCut.Data()).Write();
     TNamed("weightDefinition", "pThatreweight only").Write();
     acceptanceOutput.Close();
 
     TFile output(Form(
-        "%s/ROOTs/%s_%s%smap_ACCxEFF_%s.root",
+        "%s/ROOTs/%s_%s_%smap_ACCxEFF_%s.root",
         outputDir.Data(), treename.Data(), SYSTEM.Data(),
         DIMENSION.Data(), WEIGHT.Data()), "RECREATE");
     hAccEff->Write();
@@ -354,11 +328,12 @@ void accXeff_MAPS(TString treename = "ntmix_X3872",
             : "pT-versus-abs(y) MC counts")).Write();
     TNamed("system", SYSTEM.Data()).Write();
     TNamed("inputMC", mcPath.Data()).Write();
+    TNamed("generatorInputMC", genPath.Data()).Write();
     TNamed("selectionCut", recoSelection.Data()).Write();
     TNamed("fitMetadataFile", fitMetadataPath.Data()).Write();
     TNamed("generatorCut", genCut.Data()).Write();
     TNamed("acceptanceCut", accCut.Data()).Write();
-    TNamed("appliedWeightParticle", particleTag.Data()).Write();
+    TNamed("appliedWeightParticle", setup.particleTag.Data()).Write();
     TNamed("appliedWeightVariable",
            WEIGHT == "raw" ? "none" : WEIGHT.Data()).Write();
     TNamed("recoWeightExpression", recoWeightExpression.Data()).Write();

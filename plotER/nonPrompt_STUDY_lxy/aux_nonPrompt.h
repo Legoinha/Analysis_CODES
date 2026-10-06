@@ -70,10 +70,10 @@ inline NonPromptSetup NonPromptSetupFor(TString systemNAME)
 		s.promptX       = dir + "/flat_ntmix_ppRef_MC_X3872.root";
 		s.nonPromptPsi  = dir + "/flat_ntmix_ppRef_MC_PSI2S_nonPrompt.root";
 		s.nonPromptX    = dir + "/flat_ntmix_ppRef_MC_X3872_nonPrompt.root";
-		s.baseCut       = "BQvalue < 0.15 && Btrk1dR < .5 && Btrk2dR < .5 && (Bpt > 7.5 && Bpt < 50)";
+		s.baseCut       = "BQvalue < 0.15 && Btrk1dR < .5 && Btrk2dR < .5 && (Bpt >= 7.5 && Bpt < 50)";
 		s.lxyCutPsi     = 0.03;
 		s.lxyCutX       = 0.03;
-		s.ptLabel       = "7.5 < p_{T} < 50 GeV/c";
+		s.ptLabel       = "7.5 #leq p_{T} < 50 GeV/c";
 		s.lxyNonPromptBins = 50;
 		s.lxyNonPromptMin  = -0.2;
 		s.lxyNonPromptMax  = .5;
@@ -83,15 +83,23 @@ inline NonPromptSetup NonPromptSetupFor(TString systemNAME)
 }
 
 
+struct WeightedCount {
+	double sumW = 0.;
+	double sumW2 = 0.;
+};
+
 // pThatreweight is present in every X3872/psi(2S) MC sample of both systems.
-inline double WeightedEntries(TTree* tree, const TString& selection)
+inline WeightedCount WeightedEntries(TTree* tree, const TString& selection)
 {
 	tree->SetEstimate(tree->GetEntries() + 1);
 	const Long64_t n = tree->Draw("pThatreweight", selection, "goff");
 	const double* values = tree->GetV1();
-	double sum = 0.;
-	for (Long64_t i = 0; i < n; ++i) sum += values[i];
-	return sum;
+	WeightedCount count;
+	for (Long64_t i = 0; i < n; ++i) {
+		count.sumW += values[i];
+		count.sumW2 += values[i] * values[i];
+	}
+	return count;
 }
 
 // The binning is always inherited from the fit output, so the MC efficiency and
@@ -130,22 +138,24 @@ inline TH1D* LxyPassFraction(TTree* tree, TString name, const TH1D* ref, TString
 	for (int i = 1; i <= h->GetNbinsX(); ++i) {
 		const double lo = h->GetXaxis()->GetBinLowEdge(i);
 		const double hi = h->GetXaxis()->GetBinUpEdge(i);
-		const TString binCut = (i == h->GetNbinsX())
-			? Form("%s >= %.8f && %s <= %.8f", varExpr.Data(), lo, varExpr.Data(), hi)
-			: Form("%s >= %.8f && %s < %.8f",  varExpr.Data(), lo, varExpr.Data(), hi);
+		const TString binCut = Form("%s >= %.8f && %s < %.8f", varExpr.Data(), lo, varExpr.Data(), hi);
 		const TString den = Form("(%s) && (%s)", s.baseCut.Data(), binCut.Data());
 		const TString num = Form("(%s) && (%s > %.6f)", den.Data(), s.lxyExpr.Data(), lxyCut);
-		const double d = WeightedEntries(tree, den);
-		const double n = WeightedEntries(tree, num);
-		const double f = (d > 0.) ? n / d : 0.;
+		const WeightedCount d = WeightedEntries(tree, den);
+		const WeightedCount n = WeightedEntries(tree, num);
+		const double f = (d.sumW > 0.) ? n.sumW / d.sumW : 0.;
+		const double failSumW2 = d.sumW2 - n.sumW2;
+		const double variance = (d.sumW > 0.)
+			? ((1. - f) * (1. - f) * n.sumW2 + f * f * failSumW2) / (d.sumW * d.sumW)
+			: 0.;
 		h->SetBinContent(i, f);
-		h->SetBinError(i, (d > 0.) ? TMath::Sqrt(f * (1. - f) / d) : 0.);
-		printf("  %s [%g, %g]: %.4f (%g / %g)\n", varExpr.Data(), lo, hi, f, n, d);
+		h->SetBinError(i, TMath::Sqrt(variance));
+		printf("  %s [%g, %g): %.4f (%g / %g)\n", varExpr.Data(), lo, hi, f, n.sumW, d.sumW);
 	}
 	return h;
 }
 
-// f_nonprompt = N_Benriched / ( eff_lxy^MC * N_inclusive ), fully propagated.
+// f_nonprompt = N_Benriched / (eff_lxy^MC * N_inclusive). The stored fit and weighted-MC errors are propagated; the covariance of the nested data fits is not available here.
 inline void FillNonPromptFraction(TH1D& hOut, TH1D* hIncl, TH1D* hBenr, TH1D* hBenrNonPromptMC)
 {
 	for (int i = 1; i <= hOut.GetNbinsX(); ++i) {

@@ -13,9 +13,9 @@ MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_
 DATA="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root"
 
 ## SELECTION CUTs go here
-CUTs_INC="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt > 7.5  && Bpt < 50)"
+CUTs_INC="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt >= 7.5 && Bpt < 50)"
 #CUTs="((Bpt > 7.5  && Bpt < 12.5 && Prediction > 0.24) || (Bpt > 12.5 && Bpt < 17.5 && Prediction > 0.38) || (Bpt > 17.5 && Bpt < 22.5 && Prediction > 0.44) || (Bpt > 22.5 && Bpt < 50 && Prediction > 0.10)) && BQvalue < 0.15  "
-CUTs="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt > 7.5  && Bpt < 50)"
+CUTs="BQvalue < 0.15 && Btrk1dR < 0.5 && Btrk2dR < 0.5 && (Bpt >= 7.5 && Bpt < 50)"
 
 
 mkdir -p ROOTfiles/

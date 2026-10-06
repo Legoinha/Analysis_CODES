@@ -18,7 +18,8 @@
 #include "aux.h"
 
 // Nominal ratio: sPlot corrected yields with each particle's own raw ACCxEFF map.
-// Total systematic boxes are read from ntmix_UNCpropagator.C outputs.
+// Systematic boxes use the ratio-level uncertainty produced by
+// ntmix_UNCpropagator.C.
 // root -l -b -q 'Ratio_CorrectedYields.C()'
 // root -l -b -q 'Ratio_CorrectedYields.C("ppRef","Bpt")'
 // root -l -b -q 'Ratio_CorrectedYields.C("ppRef","nChargedTracks")'
@@ -68,7 +69,7 @@ static PromptFractionHists LoadPromptFractions(TString treename, TString system,
         hPrompt->SetBinContent(i, prompt);
         hPrompt->SetBinError(i, fracErr);
         std::cout << "  bin " << i << " [" << hPrompt->GetXaxis()->GetBinLowEdge(i)
-                  << "," << hPrompt->GetXaxis()->GetBinUpEdge(i) << "]: f_prompt = "
+                  << "," << hPrompt->GetXaxis()->GetBinUpEdge(i) << "): f_prompt = "
                   << prompt << " +- " << fracErr << std::endl;
     }
 
@@ -162,10 +163,10 @@ static void PrintRatioTable(const TString& label, TH1D* hRatio, TH1D* hRatioSyst
     std::cout << "[Ratio_CorrectedYields] " << label << std::endl;
     for (int i = 1; i <= hRatio->GetNbinsX(); ++i) {
         std::cout << "  bin " << i << " [" << hRatio->GetXaxis()->GetBinLowEdge(i)
-                  << "," << hRatio->GetXaxis()->GetBinUpEdge(i) << "] = "
+                  << "," << hRatio->GetXaxis()->GetBinUpEdge(i) << ") = "
                   << hRatio->GetBinContent(i) << " +- " << hRatio->GetBinError(i)
                   << " (" << statLabel << ") +- " << hRatioSyst->GetBinError(i)
-                  << " (inclusive syst)" << std::endl;
+                  << " (ratio syst)" << std::endl;
     }
 }
 
@@ -363,7 +364,7 @@ static void SaveRun1Comparison(TH1D* hNominal, TH1D* hNominalSyst, TString syste
     c->cd();
     DrawCmsHeader(c, system);
     c->Update();
-    c->SaveAs(Form("output_ntmix/comparison_RUN1_%s_%s.pdf", system.Data(), var.Data()));
+    c->SaveAs(Form("output_ntmix/ntmix_X3872_OVER_ntmix_PSI2S_%s_%s_comparison_RUN1.pdf", system.Data(), var.Data()));
 
     for (TBox* box : systBoxes) delete box;
     delete hFrame;
@@ -453,7 +454,7 @@ static void SaveAtlasPromptComparison(TH1D* hPromptRatio, TH1D* hPromptRatioSyst
     c->cd();
     DrawCmsHeader(c, system);
     c->Update();
-    c->SaveAs(Form("output_ntmix/comparison_ATLAS_prompt_%s_%s.pdf", system.Data(), var.Data()));
+    c->SaveAs(Form("output_ntmix/ntmix_X3872_OVER_ntmix_PSI2S_%s_%s_comparison_ATLAS_prompt.pdf", system.Data(), var.Data()));
 
     for (TBox* box : atlasSystBoxes) delete box;
     delete hFrame;

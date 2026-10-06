@@ -1,0 +1,26 @@
+# One job per kind of the case, written straight into selectionER/scored_samples/<tree>/<year>/ (it must exist):
+#   condor_submit -append "tree = ntKp" -append "year = PbPb23" -append "fom = auc" -queue "kind in (DATA, MC)" submit_score.sub
+# (X(3872): kind in (DATA, MC_X3872, MC_X3872_NONPROMPT, MC_PSI2S, MC_PSI2S_NONPROMPT))
+universe = vanilla
+sample_output_dir = tmva_outputs/$(tree)/$(year)_$(fom)
+
+initialdir = /eos/user/h/hmarques/Analysis_CODES/selectionER/scored_samples/$(tree)/$(year)
+executable = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/run_tmva.sh
+arguments = -l -b -q TMVA_apply.C
+# The model and its report are read from the /eos mount of the worker: condor on EOS cannot transfer a folder in.
+environment = "ML_CASE=$(tree)/$(year) ML_FOM=$(fom) ML_KIND=$(kind) ML_OUTPUT_DIR=/eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/$(sample_output_dir) ML_SCORED_DIR=. ML_USE_XROOTD=1"
+
+transfer_input_files = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/TMVA_apply.C, /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/TMVA_config.h, /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/TMVA_decorrelation.h, /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/ml_settings.h
+transfer_output_files = flat_$(tree)_$(year)_tmva_$(fom)_scored_$(kind).root
+output = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/condor_logs/score_$(tree)_$(year)_$(fom)_$(kind)_$(ClusterId).out
+error = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/condor_logs/score_$(tree)_$(year)_$(fom)_$(kind)_$(ClusterId).err
+log = /eos/user/h/hmarques/Analysis_CODES/selectionER/ML_selection/methods/ML_tmva/condor_logs/score_$(tree)_$(year)_$(fom)_$(ClusterId).log
+
+getenv = False
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_cpus = 1
+request_memory = 6 GB
+request_disk = 40 GB
+requirements = (OpSysAndVer == "AlmaLinux9")
++JobFlavour = "workday"

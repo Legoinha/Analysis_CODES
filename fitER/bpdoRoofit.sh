@@ -9,7 +9,7 @@ MC_Bp="/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_M
 #Data and MC Samples
 
 ## NEW CUTS ? here 
-CUTs="Bnorm_svpvDistance_2D > 4 && Bpt > 7.5"
+CUTs="Bnorm_svpvDistance_2D > 4 && Bpt > 10"
 
 
 ##
@@ -31,7 +31,7 @@ root -b -q "roofitB.C++(\"ntKp\", \
                       \"Bpt\", \
                       \"$CUTs\", \
                       \"$syst\", \
-                      std::vector<double>{7.5,60})"
+                      std::vector<double>{10,60})"
 fi
 
 if [ $DOANALYSISPbPb_BINNED_PT_Bp  -eq 1  ]; then

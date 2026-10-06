@@ -14,6 +14,7 @@ static TString RatioAxisTitle(TString var)
     if (var == "Bpt") return "p_{T} [GeV]";
     if (var == "By") return "|y|";
     if (var == "nMult" || var == "nChargedTracks") return "N_{trk}";
+    if (var == "CentBin") return "Centrality (%)";
     return var;
 }
 
@@ -58,13 +59,15 @@ static TH1D* LoadHistFromFile(TString fileName, TString histName, TString cloneN
     return out;
 }
 
-static TH1D* LoadParticleTotalUnc(TString treename, TString system, TString var)
+static TH1D* LoadRatioTotalUnc(TString system, TString var)
 {
-    const TString path = Form("output_ntmix/systematicFILES/ntmix_totalUnc_%s_%s_%s.root", treename.Data(), system.Data(), var.Data());
+    const TString path = Form(
+        "output_ntmix/systematicFILES/ntmix_ratioUnc_X3872_over_PSI2S_%s_%s.root",
+        system.Data(), var.Data());
     TFile f(path, "READ");
     TH1D* h = nullptr;
     f.GetObject("hTotalUncPercent", h);
-    TH1D* out = (TH1D*)h->Clone(Form("hTotalUncPercent_%s_%s", treename.Data(), var.Data()));
+    TH1D* out = (TH1D*)h->Clone(Form("hRatioTotalUncPercent_%s_%s", system.Data(), var.Data()));
     out->SetDirectory(nullptr);
     f.Close();
     return out;
@@ -72,8 +75,8 @@ static TH1D* LoadParticleTotalUnc(TString treename, TString system, TString var)
 
 static TH1D* BuildNominalRatio(TString system, TString var)
 {
-    const TString numFile = Form("../effER/output/%s/ROOTs/ntmix_X3872_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
-    const TString denFile = Form("../effER/output/%s/ROOTs/ntmix_PSI2S_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
+    const TString numFile = Form("../effER/output/ntmix_X3872/%s/ROOTs/ntmix_X3872_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
+    const TString denFile = Form("../effER/output/ntmix_PSI2S/%s/ROOTs/ntmix_PSI2S_%s_%s_2D_raw_sPlot_CorrectedYields.root", system.Data(), system.Data(), var.Data());
     TH1D* hNum = LoadHistFromFile(numFile, "hYieldCorr",
                                   Form("hYieldCorr_X3872_%s", var.Data()),
                                   "raw", "X3872", "none");
@@ -92,18 +95,16 @@ static TH1D* BuildNominalRatio(TString system, TString var)
 
 static TH1D* BuildRatioSystematic(TH1D* hRatio, TString system, TString var)
 {
-    TH1D* hX   = LoadParticleTotalUnc("ntmix_X3872", system, var);
-    TH1D* hPsi = LoadParticleTotalUnc("ntmix_PSI2S", system, var);
+    TH1D* hTotal = LoadRatioTotalUnc(system, var);
     TH1D* hRatioSyst = (TH1D*)hRatio->Clone(Form("hRatioSyst_%s_%s", system.Data(), var.Data()));
     hRatioSyst->SetDirectory(nullptr);
     hRatioSyst->SetTitle(Form(";%s;X(3872) / #psi(2S)", RatioAxisTitle(var).Data()));
     for (int i = 1; i <= hRatioSyst->GetNbinsX(); ++i) {
-        const double rel = std::sqrt(std::pow(hX->GetBinContent(i), 2) + std::pow(hPsi->GetBinContent(i), 2)) / 100.0;
+        const double rel = hTotal->GetBinContent(i) / 100.0;
         hRatioSyst->SetBinContent(i, hRatio->GetBinContent(i));
         hRatioSyst->SetBinError(i, hRatio->GetBinContent(i) * rel);
     }
-    delete hX;
-    delete hPsi;
+    delete hTotal;
     return hRatioSyst;
 }
 

@@ -325,7 +325,7 @@ inline FitSignificanceResult GetFitSignificanceForPlot(
 			latex.SetTextSize(0.060);
 			latex.DrawLatex(0.18, 0.84, FitParticleLabel(tree, true));
 			latex.SetTextSize(0.035);
-			latex.DrawLatex(0.18, 0.77, Form("%.0f < %s < %.0f", binMin, FitVarLabel(var).Data(), binMax));
+			latex.DrawLatex(0.18, 0.77, Form("%.0f #leq %s < %.0f", binMin, FitVarLabel(var).Data(), binMax));
 			latex.DrawLatex(0.62, 0.66, Form("q_{0} = %.2f", q0));
 			latex.DrawLatex(0.62, 0.60, Form("Z_{PL} = %.2f", result.value));
 
@@ -517,11 +517,11 @@ inline std::vector<SystVariationConfig> GetSignalSystematicModels(const TString&
 inline std::string GetSystematicColumnLabel(const TString& var, double lowEdge, double highEdge)
 {
 	std::ostringstream clabel;
-	if (var == "Bpt") { clabel << lowEdge << "$<p_T<$" << highEdge   ;} 
-  else if (var == "By") { clabel << lowEdge << "$<|y|<$" << highEdge ;} 
-  else if (var == "nChargedTracks") { clabel << lowEdge << "$<nTrks<$" << highEdge ;}
-  else if (var == "CentBin") { clabel << lowEdge << "$<Cent<$" << highEdge ;} 
-  else { clabel << lowEdge << "<" << var.Data() << "<" << highEdge  ;}
+	if (var == "Bpt") { clabel << lowEdge << "$\\leq p_T<$" << highEdge   ;}
+  else if (var == "By") { clabel << lowEdge << "$\\leq |y|<$" << highEdge ;}
+  else if (var == "nChargedTracks") { clabel << lowEdge << "$\\leq nTrks<$" << highEdge ;}
+  else if (var == "CentBin") { clabel << lowEdge << "$\\leq Cent<$" << highEdge ;}
+  else { clabel << lowEdge << "$\\leq$" << var.Data() << "$<$" << highEdge  ;}
 	return clabel.str();
 }
 
