@@ -42,7 +42,7 @@ def build_objective(data, features, fom, n_rounds, early_stopping, c):
             "eval_metric": "auc",
             "max_depth": trial.suggest_int("max_depth", 2, c["xgb_max_depth"]),
             "eta": trial.suggest_float("eta", 0.005, 0.3, log=True),
-            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 20.0, log=True),
+            "min_child_weight": trial.suggest_float("min_child_weight", *c["xgb_min_child_weight"], log=True),
             "gamma": trial.suggest_float("gamma", 0.0, 8.0),
             "subsample": trial.suggest_float("subsample", 0.55, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.55, 1.0),

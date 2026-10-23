@@ -54,7 +54,8 @@ CASES = VARIANT_CASES[VARIANT]
 def case(name, variant=VARIANT):
     """Settings and paths of one case, "<tree>/<year>", in a test variant (default ML_VARIANT):
     settings.MASS and settings.CASES entries, the per-tree features, pool, forward selection, final check,
-    decorrelation, DATA thinning, XGBoost depth cap and Punzi threshold step, and
+    decorrelation, DATA thinning, XGBoost depth cap and min_child_weight range, Punzi threshold step and
+    overtraining AUC-gap sigma, and
       inputs                  per input key (settings.INPUTS): its flat tree, kind, label, flat file, skim and
                               skim_cut (the pre-cut; DATA also inside the decorrelation range, the only DATA
                               the selection uses; make_skims.py then thins it, settings.DATA_THINNING)
@@ -64,12 +65,15 @@ def case(name, variant=VARIANT):
       training_sideband_cut   the training sidebands as a ROOT cut
       skim_dir, maps          the skims and the decorrelation maps"""
     tree, year = name.split("/")
-    c = copy.deepcopy({**settings.MASS[tree], **settings.CASES[tree][year]})
-    c.update({"name": name, "tree": tree, "year": year, "label": f"{tree} {year}",
-              "features": list(settings.FEATURES[tree]), "pool": list(settings.POOL[tree]),
-              "forward_selection": settings.FORWARD_SELECTION[tree], "final_check": settings.FINAL_CHECK[tree],
-              "decorrelate": dict(settings.DECORRELATE[tree]), "data_thinning": settings.DATA_THINNING[tree],
-              "xgb_max_depth": settings.XGB_MAX_DEPTH[tree], "threshold_step": settings.THRESHOLD_STEP[tree]})
+    # A CASES entry may set any of the per-tree settings for itself.
+    c = copy.deepcopy({**settings.MASS[tree],
+                       "features": settings.FEATURES[tree], "pool": settings.POOL[tree],
+                       "forward_selection": settings.FORWARD_SELECTION[tree], "final_check": settings.FINAL_CHECK[tree],
+                       "decorrelate": settings.DECORRELATE[tree], "data_thinning": settings.DATA_THINNING[tree],
+                       "xgb_max_depth": settings.XGB_MAX_DEPTH[tree], "xgb_min_child_weight": settings.XGB_MIN_CHILD_WEIGHT[tree],
+                       "threshold_step": settings.THRESHOLD_STEP[tree], "auc_gap_sigma": settings.AUC_GAP_SIGMA[tree],
+                       **settings.CASES[tree][year]})
+    c.update({"name": name, "tree": tree, "year": year, "label": f"{tree} {year}"})
     if variant == "2018MCall":
         c["files"].update({key: path for key, path in settings.CASES["ntmix"]["PbPb18"]["files"].items() if key != "data"})
     elif variant == "dR035":
@@ -255,7 +259,7 @@ def write_cpp_settings():
                 f'     {{{sides}}},\n'
                 f'     {{{pt_bins}}},\n'
                 f'     "{c["skim_dir"]}",\n'
-                f'     {c["threshold_step"]!r}}}}}')
+                f'     {c["threshold_step"]!r}, {c["auc_gap_sigma"]!r}}}}}')
     text = f"""// Written from ML_selection/settings.py by ml_samples.write_cpp_settings(): edit settings.py, not this file.
 // The settings of TMVA (TMVA_config.h) and of optimalCUT_X_punzi.C.
 #ifndef ML_SETTINGS_H
@@ -278,7 +282,7 @@ struct Input {{
 // One case, "<tree>/<year>" (in a test variant "<tree>/<year>:<variant>"): its inputs (data, signal
 // and spectators), production features, training sidebands, Punzi window and sidebands around the peak
 // (GeV) and the sides of these (-1 below the peak, +1 above), pT bins of optimalCUT_X_punzi.C, skim
-// folder, and step of the Punzi threshold grid.
+// folder, step of the Punzi threshold grid, and sigma of the overtraining AUC-gap limit.
 struct Case {{
    TString tree;
    TString year;
@@ -294,6 +298,7 @@ struct Case {{
    std::vector<double> ptBins;
    TString skimDir;
    double thresholdStep;
+   double aucGapSigma;
 }};
 
 static const std::map<TString, Case> CASES = {{
@@ -310,7 +315,6 @@ static const double PUNZI_B = {settings.PUNZI_B!r};
 static const double PUNZI_MIN_BACKGROUND = {settings.PUNZI_MIN_BACKGROUND!r};
 static const double KS_PVALUE_MIN = {settings.KS_PVALUE_MIN!r};
 static const double MAX_AUC_GAP = {settings.MAX_AUC_GAP!r};
-static const double AUC_GAP_SIGMA = {settings.AUC_GAP_SIGMA!r};
 
 }} // namespace MLSettings
 

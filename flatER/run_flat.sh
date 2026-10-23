@@ -14,6 +14,9 @@ KIND="$2"
 TREE="$3"
 PARTICLE="${4:-}"
 PVSNP="${5:-}"
+# Optional sample tag, e.g. "_private" or "_official": only file lists whose name contains it are used,
+# and it is appended to the output name. Without it, tagged lists (*_private*, *_official*) are ignored.
+SAMPLE="${6:-}"
 
 FILELIST_SUBDIR="${FILELIST_DIR}/${KIND}"
 
@@ -31,8 +34,8 @@ fi
 mkdir -p "${OUTPUT_DIR}"
 echo "Writing flattened samples to ${OUTPUT_DIR}"
 
-FINAL_OUTPUT="${OUTPUT_DIR}/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}.root"
-TMP_OUTPUT="$(mktemp "/tmp/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}.XXXXXX.root")"
+FINAL_OUTPUT="${OUTPUT_DIR}/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}${SAMPLE}.root"
+TMP_OUTPUT="$(mktemp "/tmp/flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}${SAMPLE}.XXXXXX.root")"
 INDEXED_OUTPUTS=()
 MATCHED_LISTS=()
 SYSTEM_MATCH="${SYSTEM,,}"
@@ -40,11 +43,17 @@ KIND_MATCH="${KIND,,}"
 TREE_MATCH="${TREE,,}"
 PARTICLE_MATCH="${PARTICLE,,}"
 PVSNP_MATCH="${PVSNP,,}"
+SAMPLE_MATCH="${SAMPLE,,}"
 
 # For DATA, only the system matters. For MC ntmix, particle matters too. For other MC, tree is enough.
 while IFS= read -r list_path; do
   list_name="$(basename "${list_path}")"
   list_match="${list_name,,}"
+  if [[ -n "${SAMPLE_MATCH}" ]]; then
+    [[ "${list_match}" == *"${SAMPLE_MATCH}"* ]] || continue
+  else
+    [[ "${list_match}" == *"_private"* || "${list_match}" == *"_official"* ]] && continue
+  fi
 
   if [[ "${KIND}" == "DATA" ]]; then
     if [[ "${list_match}" == *"${KIND_MATCH}"* && "${list_match}" == *"${SYSTEM_MATCH}"* ]]; then
@@ -67,13 +76,19 @@ while IFS= read -r list_path; do
   fi
 done < <(find "${FILELIST_SUBDIR}" -type f -name '*.txt' | sort)
 
+if [[ ${#MATCHED_LISTS[@]} -eq 0 ]]; then
+  echo "No file list in ${FILELIST_SUBDIR} matches ${SYSTEM} ${KIND} ${TREE} ${PARTICLE} ${PVSNP} ${SAMPLE}" >&2
+  exit 1
+fi
+echo "File lists used: ${MATCHED_LISTS[*]}"
+
 cd "${SCRIPT_DIR}"
 
 # MC: flatten all matched lists in one run. The pThat weights need n_gen of every
 # pThat sample of the group, counted over all of its files.
 COMBINED_LIST=""
 if [[ "${KIND}" == "MC" ]]; then
-  COMBINED_LIST="$(mktemp "/tmp/filelist_${TREE}_${SYSTEM}_MC${CASETAG}.XXXXXX.txt")"
+  COMBINED_LIST="$(mktemp "/tmp/filelist_${TREE}_${SYSTEM}_MC${CASETAG}${SAMPLE}.XXXXXX.txt")"
   awk 1 "${MATCHED_LISTS[@]}" > "${COMBINED_LIST}"
   MATCHED_LISTS=("${COMBINED_LIST}")
 fi
@@ -81,7 +96,7 @@ fi
 # Run the flattener once per matched list and tag each chunk with _0, _1, _2, ...
 for idx in "${!MATCHED_LISTS[@]}"; do
   FILELIST="${MATCHED_LISTS[$idx]}"
-  NUN="_${idx}"
+  NUN="${SAMPLE}_${idx}"
   OUTPUT_CHUNK="flat_${TREE}_${SYSTEM}_${KIND}${CASETAG}${NUN}.root"
   OUTPUT_CHUNK_PATH="${SCRIPT_DIR}/${OUTPUT_CHUNK}"
 
@@ -105,6 +120,6 @@ rm -f "${INDEXED_OUTPUTS[@]}" ${COMBINED_LIST:+"${COMBINED_LIST}"}
 if [[ "${KIND}" == "MC" ]]; then
   FLAT_TREE_NAME="${TREE}${PARTICLE}"
   for VARIABLE in Bpt pthat; do
-    root -l -b -q "${PLOT_MACRO_NAME}(\"${FINAL_OUTPUT}\",\"${FLAT_TREE_NAME}\",\"${TREE}\",\"${SYSTEM}\",\"${PARTICLE}\",\"${PVSNP}\",\"${REWEIGHT_PLOT_DIR}\",\"${VARIABLE}\",\"pThatreweight\",100)"
+    root -l -b -q "${PLOT_MACRO_NAME}(\"${FINAL_OUTPUT}\",\"${FLAT_TREE_NAME}\",\"${TREE}\",\"${SYSTEM}${SAMPLE}\",\"${PARTICLE}\",\"${PVSNP}\",\"${REWEIGHT_PLOT_DIR}\",\"${VARIABLE}\",\"pThatreweight\",100)"
   done
 fi

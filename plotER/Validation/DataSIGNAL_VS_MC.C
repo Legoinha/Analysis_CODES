@@ -12,13 +12,13 @@
 #include <TParameter.h>
 #include <TNamed.h>
 #include <TObjString.h>
-#include <TPRegexp.h>
 #include <TLatex.h>
 
 #include <RooRealVar.h>
 #include <RooArgSet.h>
 #include <RooArgList.h>
 #include <RooDataSet.h>
+#include <RooFormulaVar.h>
 #include <RooWorkspace.h>
 #include <RooAbsPdf.h>
 #include <RooFitResult.h>
@@ -46,7 +46,30 @@ struct ValidationHist {
     TH1D* sideband;
     TH1D* splot;
     TH1D* mc;
+    TH1D* nonPromptMC;
 };
+
+static double sumMCWeights(TTree* tree, const TString& cut)
+{
+    TTreeFormula cutFormula("sumCutFormula", cut.Data(), tree);
+    TTreeFormula pThatFormula("sumPThatFormula", "pThatreweight", tree);
+    double sumWeights = 0.;
+    Int_t currentTree = -1;
+    for (Long64_t i = 0; i < tree->GetEntries(); ++i) {
+        tree->LoadTree(i);
+        tree->GetEntry(i);
+        if (tree->GetTreeNumber() != currentTree) {
+            currentTree = tree->GetTreeNumber();
+            cutFormula.UpdateFormulaLeaves();
+            pThatFormula.UpdateFormulaLeaves();
+        }
+        cutFormula.GetNdata();
+        pThatFormula.GetNdata();
+        if (cutFormula.EvalInstance() == 0.0) continue;
+        sumWeights += pThatFormula.EvalInstance();
+    }
+    return sumWeights;
+}
 
 static void fillMCHistFromTree(TTree* tree, TH1D* hist, const TString& expr, const TString& cut,
                                const ReweightInput* reweightInput)
@@ -94,7 +117,16 @@ void DataSIGNAL_VS_MC(
     TString weightToApply,
     TString selectedWeightParticleTag,
     TString systemTag,
-    bool showBackgroundProjections = true)
+    bool showBackgroundProjections = true,
+    TString outputDirectory = "",
+    TString signalHeader = "",
+    TString mcLegendLabel = "",
+    bool showComparisonLabel = true,
+    TString lxyRegion = "",
+    TString nonPromptFractionPath = "",
+    TString mixtureModelPath = "",
+    TString mixtureFractionHist = "",
+    bool writePayload = true)
 {
     std::cout << "[validation] Fit model: " << modelPath << std::endl;
     const bool REWEIGHT_MC = !weightToApply.IsNull();
@@ -102,11 +134,14 @@ void DataSIGNAL_VS_MC(
     gStyle->SetOptTitle(0);
     const bool isNtKp = (treeName == "ntKp");
 
-    TString compareBaseDir = Form("Compare_%s", systemTag.Data());
-    TString treeOutDir = Form("%s/%s", compareBaseDir.Data(), treeName.Data());
+    TString treeOutDir = outputDirectory;
+    if (treeOutDir.IsNull()) {
+        const TString compareBaseDir = Form("Compare_%s", systemTag.Data());
+        treeOutDir = Form("%s/%s", compareBaseDir.Data(), treeName.Data());
+        gSystem->mkdir(compareBaseDir, true);
+    }
     TString outDir = treeOutDir;
     if (REWEIGHT_MC) outDir = Form("%s/reweightMC_comparison", treeOutDir.Data());
-    gSystem->mkdir(compareBaseDir, true);
     gSystem->mkdir(treeOutDir, true);
     gSystem->mkdir(outDir, true);
 
@@ -124,10 +159,39 @@ void DataSIGNAL_VS_MC(
     const double fitVariableMin = analysisVarBins->GetXaxis()->GetBinLowEdge(1);
     const double fitVariableMax =
         analysisVarBins->GetXaxis()->GetBinUpEdge(analysisVarBins->GetNbinsX());
-    const TString baseCut = Form(
+    TString baseCut = Form(
         "(%s) && (abs(%s)>=%0.17g && abs(%s)<%0.17g)",
         fitSelection.Data(), fitVariable.Data(), fitVariableMin,
         fitVariable.Data(), fitVariableMax);
+    const TString baseCutBeforeLxy = baseCut;
+
+    TString lxyExpression;
+    double lxyCut = 0.;
+    double lxyPromptMin = 0.;
+    double lxyPromptMax = 0.;
+    double lxyNonPromptMin = 0.;
+    double lxyNonPromptMax = 0.;
+    double nonPromptFraction = 0.;
+    if (!nonPromptFractionPath.IsNull()) {
+        TFile fractionFile(nonPromptFractionPath, "READ");
+        lxyExpression = static_cast<TObjString*>(fractionFile.Get("lxyExpression"))->GetString();
+        lxyCut = static_cast<TParameter<double>*>(fractionFile.Get("lxyCut_cm"))->GetVal();
+        lxyPromptMin = static_cast<TParameter<double>*>(fractionFile.Get("lxyPromptMin_cm"))->GetVal();
+        lxyPromptMax = static_cast<TParameter<double>*>(fractionFile.Get("lxyPromptMax_cm"))->GetVal();
+        lxyNonPromptMin = static_cast<TParameter<double>*>(fractionFile.Get("lxyNonPromptMin_cm"))->GetVal();
+        lxyNonPromptMax = static_cast<TParameter<double>*>(fractionFile.Get("lxyNonPromptMax_cm"))->GetVal();
+        if (lxyRegion == "prompt") {
+            baseCut = Form("(%s) && (%s < %.17g)", baseCut.Data(),
+                           lxyExpression.Data(), lxyCut);
+        } else if (lxyRegion == "nonprompt") {
+            baseCut = Form("(%s) && (%s > %.17g)", baseCut.Data(),
+                           lxyExpression.Data(), lxyCut);
+        }
+        if (!mixtureFractionHist.IsNull()) {
+            nonPromptFraction = static_cast<TH1D*>(
+                fractionFile.Get(mixtureFractionHist))->GetBinContent(1);
+        }
+    }
 
     std::cout << "[validation] Fit metadata input DATA: " << dataPath << std::endl;
     std::cout << "[validation] Fit metadata input MC:   " << mcPath << std::endl;
@@ -137,9 +201,23 @@ void DataSIGNAL_VS_MC(
 
     TFile* fData = TFile::Open(dataPath.Data(), "READ");
     TFile* fMC = TFile::Open(mcPath.Data(), "READ");
+    TFile* fMixtureModel = nullptr;
+    TFile* fMixtureMC = nullptr;
+    TTree* tMixtureMC = nullptr;
+    if (!mixtureModelPath.IsNull()) {
+        fMixtureModel = TFile::Open(mixtureModelPath.Data(), "READ");
+        const TString mixtureMCPath =
+            static_cast<TObjString*>(fMixtureModel->Get("inputMC"))->GetString();
+        fMixtureMC = TFile::Open(mixtureMCPath.Data(), "READ");
+        fMixtureMC->GetObject(treeName.Data(), tMixtureMC);
+        std::cout << "[validation] Mixture nonprompt MC: " << mixtureMCPath
+                  << ", f_nonprompt = " << nonPromptFraction << std::endl;
+    }
     auto closeInputFiles = [&]() {
         fData->Close(); delete fData; fData = nullptr;
         fMC->Close(); delete fMC; fMC = nullptr;
+        if (fMixtureMC) { fMixtureMC->Close(); delete fMixtureMC; fMixtureMC = nullptr; }
+        if (fMixtureModel) { fMixtureModel->Close(); delete fMixtureModel; fMixtureModel = nullptr; }
         fModel->Close(); delete fModel; fModel = nullptr;
     };
 
@@ -160,6 +238,25 @@ void DataSIGNAL_VS_MC(
     const double maxPThatWeight = tMC->GetMaximum("pThatreweight");
     std::cout << "[validation] Applying pThatreweight to every selected MC entry; range = ["
               << minPThatWeight << ", " << maxPThatWeight << "]" << std::endl;
+    if (tMixtureMC) {
+        std::cout << "[validation] Applying pThatreweight to every selected nonprompt-mixture MC entry; range = ["
+                  << tMixtureMC->GetMinimum("pThatreweight") << ", "
+                  << tMixtureMC->GetMaximum("pThatreweight") << "]" << std::endl;
+        if (!lxyRegion.IsNull()) {
+            const double promptEfficiency = sumMCWeights(tMC, baseCut) /
+                                            sumMCWeights(tMC, baseCutBeforeLxy);
+            const double nonPromptEfficiency = sumMCWeights(tMixtureMC, baseCut) /
+                                               sumMCWeights(tMixtureMC, baseCutBeforeLxy);
+            nonPromptFraction = nonPromptFraction * nonPromptEfficiency /
+                ((1. - nonPromptFraction) * promptEfficiency +
+                 nonPromptFraction * nonPromptEfficiency);
+            std::cout << "[validation] MC efficiencies after " << lxyExpression << " "
+                      << (lxyRegion == "prompt" ? "< " : "> ") << lxyCut
+                      << ": prompt=" << promptEfficiency
+                      << ", nonprompt=" << nonPromptEfficiency
+                      << ", selected f_nonprompt=" << nonPromptFraction << std::endl;
+        }
+    }
 
     RooWorkspace* ws = nullptr;
     fModel->GetObject("ws_nominal", ws);
@@ -196,7 +293,7 @@ void DataSIGNAL_VS_MC(
 
     ReweightInput reweightInput;
     TString reweightTag = "";
-    if (!REWEIGHT_MC) {
+    if (!REWEIGHT_MC && writePayload) {
         std::cout << "Running nominal validation; every available comparison weight will be saved to "
                   << weightPath << std::endl;
     }
@@ -280,35 +377,27 @@ void DataSIGNAL_VS_MC(
 
     auto vars = getSignalVars(treeName, systemTag, fitVariable,
                               fitVariableMin, fitVariableMax);
-
-    std::vector<VarCfgSignal> availableVars;
-    for (const auto& var : vars) {
-        const bool missingInData = !tData->GetBranch(var.expr);
-        const bool missingInMC = !tMC->GetBranch(var.expr);
-        if (missingInData || missingInMC) {
-            std::cerr << "[validation] WARNING: skipping comparison " << var.expr << "; branch missing from"
-                      << (missingInData ? " DATA" : "")
-                      << (missingInMC ? " MC" : "") << "." << std::endl;
-            continue;
-        }
-        availableVars.push_back(var);
-    }
-    vars.swap(availableVars);
-
-    // The classifier score is drawn from its cut in the fit selection ("Prediction > <threshold>") up to 1.
-    for (auto& var : vars) {
-        if (var.expr == "Prediction") {
-            std::unique_ptr<TObjArray> threshold(TPRegexp("Prediction\\s*>=?\\s*([0-9.eE+-]+)").MatchS(baseCut));
-            var.xmin = static_cast<TObjString*>(threshold->At(1))->GetString().Atof();
-            var.xmax = 1.0;
+    if (!nonPromptFractionPath.IsNull()) {
+        for (auto& var : vars) {
+            if (validationVariableTag(var) != "lxy") continue;
+            if (lxyRegion == "prompt") {
+                var.xmin = lxyPromptMin;
+                var.xmax = std::min(lxyPromptMax, lxyCut);
+            } else if (lxyRegion == "nonprompt") {
+                var.xmin = std::max(lxyNonPromptMin, lxyCut);
+                var.xmax = lxyNonPromptMax;
+            } else {
+                var.xmin = lxyNonPromptMin;
+                var.xmax = lxyNonPromptMax;
+            }
         }
     }
 
     if (REWEIGHT_MC) {
         const auto reweightCfg = std::find_if(vars.begin(), vars.end(), [&](const VarCfgSignal& var) {
-            return weightToApply == var.expr;
+            return weightToApply == validationVariableTag(var);
         });
-        reweightTag = reweightCfg->expr;
+        reweightTag = validationVariableTag(*reweightCfg);
         const TString reweightFolderTag = Form("%s__weight%s", reweightTag.Data(),
                                                 selectedWeightParticleTag.Data());
         outDir = Form("%s/reweightMC_comparison/%s", treeOutDir.Data(),
@@ -339,7 +428,7 @@ void DataSIGNAL_VS_MC(
 
     for (const auto& v : vars) {
         TString expr = v.absVal ? Form("abs(%s)", v.expr.Data()) : v.expr;
-        TString tag = v.expr;
+        TString tag = validationVariableTag(v);
 
         TH1D* hDataSR = new TH1D(Form("hDataSR_%s_%s", tag.Data(), treeName.Data()), v.title, v.nbins, v.xmin, v.xmax);
         TH1D* hDataSB = new TH1D(Form("hDataSB_%s_%s", tag.Data(), treeName.Data()), v.title, v.nbins, v.xmin, v.xmax);
@@ -362,12 +451,25 @@ void DataSIGNAL_VS_MC(
 
         fillMCHistFromTree(tMC, hMC, expr, cutMC,
                            REWEIGHT_MC ? &reweightInput : nullptr);
+        if (hMC->Integral() > 0) hMC->Scale(1.0 / hMC->Integral());
+        TH1D* hNonPromptMC = nullptr;
+        if (tMixtureMC) {
+            hNonPromptMC = (TH1D*)hMC->Clone(
+                Form("hNonPromptMC_%s_%s", tag.Data(), treeName.Data()));
+            hNonPromptMC->Reset("ICES");
+            fillMCHistFromTree(tMixtureMC, hNonPromptMC, expr, cutMC,
+                               REWEIGHT_MC ? &reweightInput : nullptr);
+            if (hNonPromptMC->Integral() > 0) {
+                hNonPromptMC->Scale(nonPromptFraction / hNonPromptMC->Integral());
+            }
+            hMC->Scale(1.0 - nonPromptFraction);
+            hMC->Add(hNonPromptMC);
+        }
 
         if (hBackgroundSideband->Integral() > 0) hBackgroundSideband->Scale(1.0 / hBackgroundSideband->Integral());
         if (hSideband->Integral() > 0) hSideband->Scale(1.0 / hSideband->Integral());
-        if (hMC->Integral() > 0) hMC->Scale(1.0 / hMC->Integral());
 
-        hists.push_back({v, tag, v.expr, hBackgroundSideband, hBackgroundSplot, hSideband, hSPlot, hMC});
+        hists.push_back({v, tag, tag, hBackgroundSideband, hBackgroundSplot, hSideband, hSPlot, hMC, hNonPromptMC});
         delete hDataSR;
         delete hDataSB;
     }
@@ -382,7 +484,16 @@ void DataSIGNAL_VS_MC(
         }
     };
     for (const auto& h : hists) {
-        addObsIfAvailable(h.baseVar);
+        if (h.tag == h.var.expr) {
+            addObsIfAvailable(h.baseVar);
+            continue;
+        }
+
+        TTreeFormula variableFormula(Form("validationVariableFormula_%s", h.tag.Data()),
+                                     h.var.expr.Data(), tData);
+        for (int i = 0; i < variableFormula.GetNcodes(); ++i) {
+            addObsIfAvailable(variableFormula.GetLeaf(i)->GetBranch()->GetName());
+        }
     }
 
     // Every DATA branch the selection reads (pre-cut, score) joins the observables: the RooDataSet applies the cut on them.
@@ -392,6 +503,12 @@ void DataSIGNAL_VS_MC(
     }
     TString dataCut = Form("(%s) && (Bmass>%f && Bmass<%f)", baseCut.Data(), massMin, massMax);
     RooDataSet data("data", "data", tData, obs, dataCut.Data());
+    for (const auto& h : hists) {
+        if (h.tag == h.var.expr) continue;
+        RooFormulaVar derivedVariable(h.tag.Data(), h.tag.Data(), h.var.expr.Data(),
+                                      RooArgList(*data.get()));
+        data.addColumn(derivedVariable);
+    }
     std::vector<RooRealVar*> fitYields = {nsig, nbkg};
     if (isNtKp) fitYields.push_back(nbkgPartR);
     const double yieldMax = std::max(1.0, static_cast<double>(data.numEntries()));
@@ -535,7 +652,7 @@ void DataSIGNAL_VS_MC(
 
     TFile* fWeights = nullptr;
     TString weightOutputPath = weightPath;
-    if (!REWEIGHT_MC) {
+    if (!REWEIGHT_MC && writePayload) {
         gSystem->mkdir("WEIGHTS", true);
         fWeights = TFile::Open(Form("file:%s", weightOutputPath.Data()), "RECREATE");
         TString weightVariables;
@@ -544,15 +661,26 @@ void DataSIGNAL_VS_MC(
             weightVariables += h.tag;
         }
         fWeights->cd();
-        TNamed("weightFileContract", "All available nominal sPlot/MC comparison weights; select hWeight_<variable>").Write();
+        TNamed("weightFileContract", "Nominal normalized data-sPlot and prompt-MC shapes plus hWeight_<variable> comparison weights").Write();
         TNamed("weightVariables", weightVariables.Data()).Write();
         TNamed("fitModel", modelPath.Data()).Write();
     }
 
     for (auto& h : hists) {
 
-        h.mc->SetLineColor(kOrange + 7);
+        const bool standaloneNonPromptMC = (lxyRegion == "nonprompt" && !h.nonPromptMC);
+        h.mc->SetLineColor(standaloneNonPromptMC ? kGray + 1 : kOrange + 7);
         h.mc->SetLineWidth(2);
+        if (standaloneNonPromptMC) {
+            h.mc->SetFillColorAlpha(kGray + 1, 0.35);
+            h.mc->SetFillStyle(1001);
+        }
+        if (h.nonPromptMC) {
+            h.nonPromptMC->SetLineColor(kGray + 1);
+            h.nonPromptMC->SetLineWidth(1);
+            h.nonPromptMC->SetFillColorAlpha(kGray + 1, 0.35);
+            h.nonPromptMC->SetFillStyle(1001);
+        }
         h.sideband->SetLineColor(kBlue + 1);
         h.sideband->SetMarkerColor(kBlue + 1);
         h.sideband->SetMarkerStyle(20);
@@ -573,18 +701,22 @@ void DataSIGNAL_VS_MC(
         h.backgroundSplot->SetLineWidth(2);
 
         TH1D* hWeight = nullptr;
-        if (!REWEIGHT_MC) {
+        if (!REWEIGHT_MC && writePayload) {
             hWeight = makeWeightHist(h.splot, h.mc, Form("hWeight_%s", h.tag.Data()));
             fWeights->cd();
+            h.sideband->Write(Form("hDataSideband_%s", h.tag.Data()));
+            h.splot->Write(Form("hDataSPlot_%s", h.tag.Data()));
+            h.mc->Write(Form("hPromptMC_%s", h.tag.Data()));
             hWeight->Write();
             TNamed(Form("weightExpression_%s", h.tag.Data()),
                    validationWeightExpression(h.var).Data()).Write();
         }
 
         TH1D* hMCBand = (TH1D*)h.mc->Clone(Form("hMCBand_cmp_%s", h.tag.Data()));
-        hMCBand->SetFillColorAlpha(kOrange + 7, 0.30);
+        const Color_t mcColor = standaloneNonPromptMC ? kGray + 1 : kOrange + 7;
+        hMCBand->SetFillColorAlpha(mcColor, 0.30);
         hMCBand->SetFillStyle(1001);
-        hMCBand->SetLineColor(kOrange + 7);
+        hMCBand->SetLineColor(mcColor);
         hMCBand->SetLineWidth(1);
         hMCBand->SetMarkerSize(0);
 
@@ -639,6 +771,7 @@ void DataSIGNAL_VS_MC(
         }
         h.splot->Draw("E SAME");
         hMCBand->Draw("E2 SAME");
+        if (h.nonPromptMC) h.nonPromptMC->Draw("HIST SAME");
         h.mc->Draw("HIST SAME");
         if (showBackgroundProjections) {
             h.backgroundSideband->Draw("E SAME");
@@ -647,18 +780,36 @@ void DataSIGNAL_VS_MC(
         h.sideband->Draw("E SAME");
         h.splot->Draw("E SAME");
 
-        TLegend* signalLeg = new TLegend(0.68, showBackgroundProjections ? 0.65 : 0.64, 0.99, 0.91);
+        TString resolvedSignalHeader = signalHeader;
+        if (!resolvedSignalHeader.IsNull()) resolvedSignalHeader += ":";
+        const TString lxyHeader = lxyRegion.IsNull()
+            ? TString("")
+            : Form("l_{xy} %s %g cm", lxyRegion == "prompt" ? "<" : ">", lxyCut);
+        const bool customSignalHeader = !resolvedSignalHeader.IsNull();
+        const int signalLegendRows = 4 + (!lxyHeader.IsNull() ? 1 : 0) + (h.nonPromptMC ? 1 : 0);
+        const double signalLegendY2 = customSignalHeader ? 0.89 : 0.91;
+        const double signalLegendY1 = signalLegendY2 - 0.055 * signalLegendRows;
+        TLegend* signalLeg = new TLegend(0.60, signalLegendY1, 0.95, signalLegendY2);
         signalLeg->SetBorderSize(0);
         signalLeg->SetFillStyle(0);
         signalLeg->SetTextFont(42);
-        signalLeg->SetTextSize(showBackgroundProjections ? 0.045 : 0.055);
-        signalLeg->SetHeader("#bf{Signal}", "L");
-        signalLeg->AddEntry(h.mc, REWEIGHT_MC ? "Reweighted MC" : "MC", "l");
+        signalLeg->SetTextSize(0.045);
+        signalLeg->SetHeader(customSignalHeader
+                                 ? Form("#bf{%s}", resolvedSignalHeader.Data())
+                                 : "#bf{Signal}",
+                             "L");
+        if (!lxyHeader.IsNull()) {
+            signalLeg->AddEntry((TObject*)nullptr, Form("#bf{%s}", lxyHeader.Data()), "h");
+        }
+        const TString resolvedMCLabel = !mcLegendLabel.IsNull()
+            ? mcLegendLabel : TString(REWEIGHT_MC ? "Reweighted MC" : "MC");
+        signalLeg->AddEntry(h.mc, resolvedMCLabel, standaloneNonPromptMC ? "f" : "l");
+        if (h.nonPromptMC) signalLeg->AddEntry(h.nonPromptMC, "MC np", "f");
         signalLeg->AddEntry(h.sideband, "Sideband sub.", "lep");
         signalLeg->AddEntry(h.splot, "sPlot", "lep");
         TLegend* backgroundLeg = nullptr;
         if (showBackgroundProjections) {
-            backgroundLeg = new TLegend(0.68, 0.47, 0.99, 0.64);
+            backgroundLeg = new TLegend(0.62, 0.47, 0.95, 0.64);
             backgroundLeg->SetBorderSize(0);
             backgroundLeg->SetFillStyle(0);
             backgroundLeg->SetTextFont(42);
@@ -675,18 +826,24 @@ void DataSIGNAL_VS_MC(
         cmpLabel.DrawLatex(0.18, 0.84, FitParticleLabel(treeName, true));
         const TString mcAgreementLabel = REWEIGHT_MC ? "Rew. MC" : "MC";
         cmpLabel.SetTextSize(0.040);
-        cmpLabel.DrawLatex(0.18, 0.76, Form("#bf{sPlot-%s (%s)}", mcAgreementLabel.Data(), systemTag.Data()));
+        if (showComparisonLabel) {
+            cmpLabel.DrawLatex(0.18, 0.76,
+                               Form("#bf{sPlot-%s (%s)}", mcAgreementLabel.Data(),
+                                    systemTag.Data()));
+        }
+        const double agreementY = showComparisonLabel ? 0.70 : 0.76;
         if (agreement.ksPValue >= 0.0) {
-            cmpLabel.DrawLatex(0.18, 0.70, Form("#bf{KS=%.3f, p=%.3g}",
-                                                agreement.ksDistance, agreement.ksPValue));
+            cmpLabel.DrawLatex(0.18, agreementY, Form("#bf{KS=%.3f, p=%.3g}",
+                                                      agreement.ksDistance, agreement.ksPValue));
         } else {
-            cmpLabel.DrawLatex(0.18, 0.70, "#bf{KS=n/a}");
+            cmpLabel.DrawLatex(0.18, agreementY, "#bf{KS=n/a}");
         }
         if (agreement.ndf > 0) {
-            cmpLabel.DrawLatex(0.18, 0.64, Form("#bf{#chi^{2}/ndf=%.2f, p=%.3g (ndf=%d)}",
-                                                reducedChi2, agreement.chi2PValue, agreement.ndf));
+            cmpLabel.DrawLatex(0.18, agreementY - 0.06,
+                               Form("#bf{#chi^{2}/ndf=%.2f, p=%.3g (ndf=%d)}",
+                                    reducedChi2, agreement.chi2PValue, agreement.ndf));
         } else {
-            cmpLabel.DrawLatex(0.18, 0.64, "#bf{#chi^{2}/ndf=n/a}");
+            cmpLabel.DrawLatex(0.18, agreementY - 0.06, "#bf{#chi^{2}/ndf=n/a}");
         }
         signalLeg->Draw();
         if (backgroundLeg) backgroundLeg->Draw();
@@ -724,7 +881,7 @@ void DataSIGNAL_VS_MC(
         delete hMCBand;
     }
 
-    if (!REWEIGHT_MC) {
+    if (!REWEIGHT_MC && writePayload) {
         fWeights->Close();
         delete fWeights;
     }
@@ -734,6 +891,7 @@ void DataSIGNAL_VS_MC(
         delete h.sideband;
         delete h.splot;
         delete h.mc;
+        delete h.nonPromptMC;
     }
     delete reweightInput.hist;
     delete fitRes;
@@ -743,8 +901,10 @@ void DataSIGNAL_VS_MC(
 
     if (REWEIGHT_MC) {
         std::cout << "Done. Outputs: " << outDir << "/*.pdf" << std::endl;
-    } else {
+    } else if (writePayload) {
         std::cout << "Done. Outputs: " << treeOutDir << "/*.pdf, "
                   << weightOutputPath << std::endl;
+    } else {
+        std::cout << "Done. Outputs: " << treeOutDir << "/*.pdf" << std::endl;
     }
 }

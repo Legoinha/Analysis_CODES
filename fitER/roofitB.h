@@ -250,7 +250,8 @@ RooFitResult *fit(TString system, TString variation, TString pdf, TString tree, 
 	leg->SetFillStyle(0);
 	leg->SetTextSize(0.035);
 	leg->SetTextFont(42);
-	leg->AddEntry(frame->findObject(Form("ds_cut%d", _count)), "Data", "LEP");
+	leg->AddEntry(frame->findObject(Form("ds_cut%d", _count)),
+	              system.Contains("nonPrompt") ? "B-enriched Data" : "Data", "LEP");
 	leg->AddEntry(frame->findObject(Form("model%d_%s", _count, pdf.Data())), "Fit Model", "l");
 	leg->AddEntry(frame->findObject(Form("bkg%d_%s", _count, pdf.Data())), " Comb. Bkg.", "l");
 	if (tree == "ntKp") {

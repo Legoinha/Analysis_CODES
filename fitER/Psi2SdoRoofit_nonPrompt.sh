@@ -1,14 +1,11 @@
 syst="ppRef_nonPrompt"
 
-
 MC="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_MC_PSI2S_nonPrompt.root"
 DATA="/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root"
 
 ## SELECTION CUTs go here
-CUTs_INC="Btrk1dR < 0.5 && Btrk2dR < 0.5 && BQvalue < 0.15 && (Bpt >= 7.5 && Bpt < 50) && BLxy*(Bmass/Bpt)>0.03"
-CUTs="BQvalue < 0.15 && Btrk1dR < .5 && Btrk2dR < .5 && (Bpt >= 7.5 && Bpt < 50) && BLxy*(Bmass/Bpt)>0.03"
-
-
+CUTs_INC="Btrk1dR < 0.5 && Btrk2dR < 0.5 && BQvalue < 0.15 && (Bpt >= 7.5 && Bpt < 50) && BLxy*(Bmass/Bpt)>0.005"
+CUTs="BQvalue < 0.15 && Btrk1dR < .5 && Btrk2dR < .5 && (Bpt >= 7.5 && Bpt < 50) && BLxy*(Bmass/Bpt)>0.005"
 
 mkdir -p ROOTfiles/
 

@@ -148,22 +148,22 @@ void DrawComparison(const std::vector<std::unique_ptr<Sample>> &samples,
 // Run from the repository root with:
 // root -l -b -q 'flatER/ComparePbPbDataYears.C()'
 //
-// Unlike the MC comparison, data are not multiplied by pThatreweight. Each
-// distribution is normalized to unit area after applying the common selection.
+// Run 3 PbPb data years and the 2024 ppRef. Unlike the MC comparison, data are not multiplied by
+// pThatreweight. Each distribution is normalized to unit area after applying the common selection
+// (default: the pt10y24 region and pre-cut of selectionER/ML_selection/settings.py).
 void ComparePbPbDataYears(
-    TString cut = "Bpt > 15 && Bpt < 50 && abs(By) < 2.4 && BQvalue < 0.15 && Bchi2Prob > 0.10")
+    TString cut = "Bpt > 10 && Bpt < 50 && abs(By) < 2.4 && BQvalue < 0.15 && Btrk2dR < 0.3")
 {
     const TString base = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872";
     std::vector<std::unique_ptr<Sample>> samples;
     samples.push_back(std::make_unique<Sample>(
-        base + "/legacy_run2/REflated/flat_ntmix_PbPb18_DATA.root",
-        "2018 (5.02 TeV)", kBlue + 1));
+        base + "/PbPb23/flat_ntmix_PbPb23_DATA.root", "PbPb 2023", kRed + 1));
     samples.push_back(std::make_unique<Sample>(
-        base + "/PbPb23/flat_ntmix_PbPb23_DATA.root",
-        "2023 (5.36 TeV)", kRed + 1));
+        base + "/PbPb24/flat_ntmix_PbPb24_DATA.root", "PbPb 2024", kGreen + 2));
     samples.push_back(std::make_unique<Sample>(
-        base + "/PbPb24/flat_ntmix_PbPb24_DATA.root",
-        "2024 (5.36 TeV)", kGreen + 2));
+        base + "/PbPb25/flat_ntmix_PbPb25_DATA.root", "PbPb 2025", kBlue + 1));
+    samples.push_back(std::make_unique<Sample>(
+        base + "/ppRef24/flat_ntmix_ppRef_DATA.root", "ppRef 2024", kBlack));
 
     for (auto &sample : samples) {
         sample->file.reset(TFile::Open(sample->fileName));
@@ -174,17 +174,17 @@ void ComparePbPbDataYears(
     const TString outputDir = "flatER/data_year_comparisons/ntmix";
     gSystem->mkdir(outputDir, true);
 
-    const TString output = outputDir + "/PbPb18_vs_PbPb23_vs_PbPb24_DATA.pdf";
-    DrawComparison(samples, "dataYears_kinematic", "PbPb data", cut,
+    const TString output = outputDir + "/PbPb23_vs_PbPb24_vs_PbPb25_vs_ppRef_DATA.pdf";
+    DrawComparison(samples, "dataYears_kinematic", "Run 3 data", cut,
                    output + "(", kKinematicVars);
-    DrawComparison(samples, "dataYears_quality", "PbPb data, track quality", cut,
+    DrawComparison(samples, "dataYears_quality", "Run 3 data, track quality", cut,
                    output, kQualityVars);
-    DrawComparison(samples, "dataYears_jpsiDipion", "PbPb data, J/#psi and dipion", cut,
+    DrawComparison(samples, "dataYears_jpsiDipion", "Run 3 data, J/#psi and dipion", cut,
                    output, kJpsiDipionVars);
-    DrawComparison(samples, "dataYears_pool", "PbPb data, feature-study pool", cut,
+    DrawComparison(samples, "dataYears_pool", "Run 3 data, feature-study pool", cut,
                    output, kPoolVars);
-    DrawComparison(samples, "dataYears_production", "PbPb data, production inputs", cut,
+    DrawComparison(samples, "dataYears_production", "Run 3 data, production inputs", cut,
                    output + ")", kProductionVars);
 
-    std::cout << "Saved PbPb data-year comparison: " << output << std::endl;
+    std::cout << "Saved Run 3 data-year comparison: " << output << std::endl;
 }

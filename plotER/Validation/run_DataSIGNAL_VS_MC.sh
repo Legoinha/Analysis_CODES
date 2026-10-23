@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   bash run_DataSIGNAL_VS_MC.sh <tree> <system> [weight_to_apply] [weight_particle] [show_background]
+#   bash run_DataSIGNAL_VS_MC.sh <tree> <system> [weight_to_apply] [weight_particle] [show_background] [output_directory] [signal_header] [mc_label] [show_comparison_label] [lxy_region] [fraction_file] [mixture_model] [mixture_fraction_hist] [write_payload]
 #
 # The fit model is fitER/ROOTfiles/<system>/nominalFitModel_<tree>_<system>.root: the single-year fit (roofitB.C)
 # or, for a PbPb year, the per-year file of the combined fit (combinedANA), whichever ran last.
@@ -23,7 +23,16 @@ TREE="${1:?Missing required tree argument. See usage above.}"
 SYSTEM="${2:?Missing required system argument. See usage above.}"
 WEIGHT_TO_APPLY="${3:-}"
 WEIGHT_PARTICLE="${4:-}"
-SHOW_BACKGROUND="${5:-1}"
+SHOW_BACKGROUND="${5:-}"
+OUTPUT_DIRECTORY="${6:-}"
+SIGNAL_HEADER="${7:-}"
+MC_LABEL="${8:-}"
+SHOW_COMPARISON_LABEL="${9:-1}"
+LXY_REGION="${10:-}"
+FRACTION_FILE="${11:-}"
+MIXTURE_MODEL="${12:-}"
+MIXTURE_FRACTION_HIST="${13:-}"
+WRITE_PAYLOAD="${14:-1}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -76,13 +85,24 @@ case "$TREE" in
     ;;
 esac
 
+if [[ -z "$SHOW_BACKGROUND" ]]; then
+  case "$TREE" in
+    ntmix_X3872|ntmix_PSI2S) SHOW_BACKGROUND=1 ;;
+    *) SHOW_BACKGROUND=0 ;;
+  esac
+fi
+
 MODEL="${BASE}/fitER/ROOTfiles/${SYSTEM}/nominalFitModel_${TREE}_${SYSTEM}.root"
 
 if [[ -n "$WEIGHT_TO_APPLY" ]]; then
   RUN_TYPE="reweighted"
   WEIGHT_PARTICLE="${WEIGHT_PARTICLE:-$PARTICLE}"
 else
-  RUN_TYPE="nominal (write all comparison weights)"
+  if [[ "$WRITE_PAYLOAD" == "1" ]]; then
+    RUN_TYPE="nominal (write all comparison weights)"
+  else
+    RUN_TYPE="nominal"
+  fi
   WEIGHT_PARTICLE="$PARTICLE"
 fi
 WEIGHT_FILE="WEIGHTS/${WEIGHT_TREE}_${SYSTEM}_${WEIGHT_PARTICLE}_weight.root"
@@ -96,6 +116,10 @@ echo "  WEIGHT_TO_APPLY = ${WEIGHT_TO_APPLY:-<none>}"
 echo "  WEIGHT_PARTICLE = $WEIGHT_PARTICLE"
 echo "  WEIGHT_FILE = $WEIGHT_FILE"
 echo "  SHOW_BACKGROUND = $SHOW_BACKGROUND"
-echo "  OUTPUT_DIR  = Compare_${SYSTEM}/${TREE}"
+echo "  OUTPUT_DIR  = ${OUTPUT_DIRECTORY:-Compare_${SYSTEM}/${TREE}}"
+echo "  LXY_REGION  = ${LXY_REGION:-<inclusive>}"
+echo "  FRACTION_FILE = ${FRACTION_FILE:-<none>}"
+echo "  MIXTURE_MODEL = ${MIXTURE_MODEL:-<none>}"
+echo "  WRITE_PAYLOAD = $WRITE_PAYLOAD"
 
-root -l -b -q "DataSIGNAL_VS_MC.C(\"${MODEL}\",\"${TREE}\",\"${DATA_TREE}\",\"${MASS_AXIS_TITLE}\",\"${WEIGHT_FILE}\",\"${WEIGHT_TO_APPLY}\",\"${WEIGHT_PARTICLE}\",\"${SYSTEM}\",${SHOW_BACKGROUND})"
+root -l -b -q "DataSIGNAL_VS_MC.C(\"${MODEL}\",\"${TREE}\",\"${DATA_TREE}\",\"${MASS_AXIS_TITLE}\",\"${WEIGHT_FILE}\",\"${WEIGHT_TO_APPLY}\",\"${WEIGHT_PARTICLE}\",\"${SYSTEM}\",${SHOW_BACKGROUND},\"${OUTPUT_DIRECTORY}\",\"${SIGNAL_HEADER}\",\"${MC_LABEL}\",${SHOW_COMPARISON_LABEL},\"${LXY_REGION}\",\"${FRACTION_FILE}\",\"${MIXTURE_MODEL}\",\"${MIXTURE_FRACTION_HIST}\",${WRITE_PAYLOAD})"

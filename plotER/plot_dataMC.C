@@ -127,8 +127,6 @@ void plot_dataMC(TString TREE ="ntmix_X3872", TString systemNAME = "ppRef")
         {"Bnorm_trk2Dz",              -5.0,  5.0},
         {"BtrkLeadPt",                  0.0, 10.0},
         {"BtrkSubPt",                   0.0, 10.0},
-        {"BtrkLeadPtFrac",              0.0,  1.0},
-        {"BtrkSubPtFrac",               0.0,  1.0},
         {"BtrkMaxdR",                   0.0,  0.5},
         {"BtrkMindR",                   0.0,  0.5},
         {"BtrkMaxAbsEta",               0.0,  2.4},

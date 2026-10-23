@@ -12,7 +12,7 @@ Data_X="/eos/home-l/leyao/pbpb_work/X_analysis/XGBoost/output/selected/X_pb23_v1
 
 ## SELECTION CUTs go here
 ## Same PbPb23 baseline as PbPb_X3872doRoofit.sh + the non-prompt (displaced) requirement
-CUTs="(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && (BQvalue < 0.15) && Btrk2dR <= 0.25 && Score > 0.85 && BLxy*(Bmass/Bpt)>0.01"
+CUTs="(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && (BQvalue < 0.15) && Btrk2dR <= 0.25 && Score > 0.85 && BLxy*(Bmass/Bpt)>0.005"
 
 
 mkdir -p "ROOTfiles/$syst" "results/$syst"

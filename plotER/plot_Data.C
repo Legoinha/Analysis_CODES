@@ -10,28 +10,41 @@
 #include <TSystem.h>
 #include <TStyle.h>
 #include <iostream>
+#include <vector>
 
 #include "aux/parameters.h"
 #include "aux/masses.h"
 
-void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
+void plot_Data(TString TREE ="ntmix", TString systemNAME = "PbPb"){
     gStyle->SetOptStat(0);
 
     // Create a TChain and add all files from the directory
     TChain chain(Form("%s", TREE.Data()));
 
-    if (systemNAME.Contains("PbPb23")) { // PbPb23 data
+    // "PbPb" merges PbPb23+24+25, "PbPb_plus18" also adds PbPb18
+    bool mergedPbPb = (systemNAME == "PbPb" || systemNAME == "PbPb_plus18");
+    bool addPbPb18  = (systemNAME.Contains("PbPb18") || systemNAME == "PbPb_plus18");
+
+    std::vector<TString> PbPbYEARs;
+    for (TString year : {"PbPb23", "PbPb24", "PbPb25"}) {
+        if (mergedPbPb || systemNAME.Contains(year)) PbPbYEARs.push_back(year);
+    }
+    bool isRun3PbPb = !PbPbYEARs.empty();
+
+    for (const TString& PbPbYEAR : PbPbYEARs) { // PbPb23 / PbPb24 / PbPb25 data
         if (TREE == "ntmix") {
-            chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/PbPb23/flat_ntmix_PbPb23_DATA.root");
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/%s/flat_ntmix_%s_DATA.root", PbPbYEAR.Data(), PbPbYEAR.Data()));
             //chain.Add("/eos/user/h/hmarques/Analysis_CODES/selectionER/ML_tmva/scored_samples/flat_ntmix_PbPb23_scored_DATA.root");
         } else {
-            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/PbPb23/flat_%s_PbPb23_DATA.root", TREE.Data()));
+            chain.Add(Form("/eos/user/h/hmarques/RUN3_Data_MC_sharing/Bmesons/%s/flat_%s_%s_DATA.root", PbPbYEAR.Data(), TREE.Data(), PbPbYEAR.Data()));
         }
-    }  else if (systemNAME.Contains("PbPb18")) {
+    }
+    if (addPbPb18) {
         if (TREE == "ntmix") {
             chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/legacy_run2/REflated/flat_ntmix_PbPb18_DATA.root");
-        } 
-    } else { // ppRef data
+        }
+    }
+    if (!isRun3PbPb && !addPbPb18) { // ppRef data
         if (TREE == "ntmix"){     chain.Add("/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24/flat_ntmix_ppRef_DATA.root");}
         else if (TREE == "ntKp") {  chain.Add("./../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntKp_ppRef_DATA.root");}
         else if (TREE == "ntphi"){  chain.Add("./../../RUN3_Data_MC_sharing/Bmesons/ppRef/flat_ntphi_ppRef_DATA.root");}
@@ -52,10 +65,10 @@ void plot_Data(TString TREE ="ntmix", TString systemNAME = "ppRef"){
     TString SELECTIONcuts = "1";
 
     if (TREE == "ntmix") {
-        if (systemNAME.Contains("PbPb23")) {
-            SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && (BQvalue < 0.15) && Bchi2Prob > 0.1";
+        if (isRun3PbPb) {
+            SELECTIONcuts = "abs(By) < 1.2 && Bpt > 10 && BQvalue < 0.15 && CentBin > 15 && Btrk1dR < .25 && Btrk2dR < .25 && BtrkPtimb > 0.15";
         } else if (systemNAME.Contains("PbPb18")) {
-            SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && (BQvalue < 0.15) && (Bchi2Prob > 0.1)";  
+            SELECTIONcuts = "abs(By) < 1.2 && Bpt > 10 && BQvalue < 0.15 && CentBin > 20 && Btrk1dR < .25 && Btrk2dR < .25 && BtrkPtimb > 0.15";  
         } else {
             SELECTIONcuts = "(Bpt > 15 && Bpt < 50) && (abs(By) < 2.4) && (BQvalue < 0.15) ";
             //SELECTIONcuts = "(Bpt > 7.5 && Bpt < 50) && Prediction > 0.58 && BQvalue < 0.15 ";

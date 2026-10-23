@@ -262,10 +262,10 @@ Evaluation Evaluate(const std::vector<ScoredEvent> &training, const std::vector<
    result.auc = roc.second;
    result.trainAUC = BuildROC(training).second;
    result.aucGap = result.trainAUC - result.auc;
-   // The largest gap that passes: MAX_AUC_GAP, or AUC_GAP_SIGMA times the uncertainty of the gap
+   // The largest gap that passes: MAX_AUC_GAP, or c.aucGapSigma times the uncertainty of the gap
    // (the two AUCs are measured on disjoint candidates), whichever is larger (ml_fom.auc_gap_limit).
    result.aucGapError = std::hypot(AUCError(result.trainAUC, training), AUCError(result.auc, other));
-   result.aucGapLimit = std::max(MLSettings::MAX_AUC_GAP, MLSettings::AUC_GAP_SIGMA * result.aucGapError);
+   result.aucGapLimit = std::max(MLSettings::MAX_AUC_GAP, c.aucGapSigma * result.aucGapError);
    result.punzi = -1.0;
    // Partial AUC up to PAUC_MAX_BKG_EFF, closed with the linearly interpolated tpr at the boundary.
    const double paucMax = MLSettings::PAUC_MAX_BKG_EFF;

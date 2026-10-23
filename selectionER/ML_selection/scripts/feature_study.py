@@ -679,7 +679,7 @@ class Study:
             "training_sidebands": c["training_sidebands"],
             # The test every scan trial must pass: trials judged by another rule are not comparable.
             "overtraining": {"ks_pvalue_min": settings.KS_PVALUE_MIN, "max_auc_gap": settings.MAX_AUC_GAP,
-                             "auc_gap_sigma": settings.AUC_GAP_SIGMA},
+                             "auc_gap_sigma": c["auc_gap_sigma"]},
         })
 
     def init(self):

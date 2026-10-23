@@ -53,10 +53,10 @@ void plot_nonPrompt_fraction(TString systemNAME = "ppRef", bool inclusiveOnly = 
 	TH1D* hPsiBenrFitFull = LoadHpt(Form("%s/nominalFitModel_ntmix_PSI2S_%s_nonPrompt.root", s.fitDirNonPrompt.Data(), s.system.Data()), "hPsi2S_BenrichedFitYield_inclusive");
 	TH1D* hXBenrFitFull   = LoadHpt(Form("%s/nominalFitModel_ntmix_X3872_%s_nonPrompt.root", s.fitDirNonPrompt.Data(), s.system.Data()), "hX3872_BenrichedFitYield_inclusive");
 
-	printf("\n[%s] psi(2S) lxy efficiency, inclusive (cut %g cm)\n", s.system.Data(), s.lxyCutPsi);
-	TH1D* hPsiEffFull = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_inclusive", hPsiInclFitFull, "Bpt", s, s.lxyCutPsi);
-	printf("\n[%s] X(3872) lxy efficiency, inclusive (cut %g cm)\n", s.system.Data(), s.lxyCutX);
-	TH1D* hXEffFull   = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_inclusive", hXInclFitFull, "Bpt", s, s.lxyCutX);
+	printf("\n[%s] psi(2S) lxy efficiency, inclusive (cut %g cm)\n", s.system.Data(), s.lxyCut);
+	TH1D* hPsiEffFull = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_inclusive", hPsiInclFitFull, "Bpt", s);
+	printf("\n[%s] X(3872) lxy efficiency, inclusive (cut %g cm)\n", s.system.Data(), s.lxyCut);
+	TH1D* hXEffFull   = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_inclusive", hXInclFitFull, "Bpt", s);
 
 	TH1D* hPsiFracFull = EmptyLike(hPsiInclFitFull, "hPsi2S_dataDriven_nonprompt_fraction_inclusive", ";p_{T} [GeV/c];f_{nonprompt}");
 	TH1D* hXFracFull   = EmptyLike(hXInclFitFull, "hX3872_dataDriven_nonprompt_fraction_inclusive", ";p_{T} [GeV/c];f_{nonprompt}");
@@ -80,13 +80,13 @@ void plot_nonPrompt_fraction(TString systemNAME = "ppRef", bool inclusiveOnly = 
 		TH1D* hXBenrFitMult   = LoadHpt(Form("%s/fitResults_ntmix_X3872_nChargedTracks_%s_nonPrompt.root", s.fitDirNonPrompt.Data(), s.system.Data()), "hX3872_BenrichedFitYield_nChargedTracks");
 
 		printf("\n[%s] psi(2S) lxy efficiency vs Bpt\n", s.system.Data());
-		TH1D* hPsiEff     = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_Bpt", hPsiInclFit, "Bpt", s, s.lxyCutPsi);
+		TH1D* hPsiEff     = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_Bpt", hPsiInclFit, "Bpt", s);
 		printf("\n[%s] X(3872) lxy efficiency vs Bpt\n", s.system.Data());
-		TH1D* hXEff       = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_Bpt", hXInclFit, "Bpt", s, s.lxyCutX);
+		TH1D* hXEff       = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_Bpt", hXInclFit, "Bpt", s);
 		printf("\n[%s] psi(2S) lxy efficiency vs nChargedTracks\n", s.system.Data());
-		TH1D* hPsiEffMult = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_nChargedTracks", hPsiInclFitMult, "nChargedTracks", s, s.lxyCutPsi);
+		TH1D* hPsiEffMult = LxyPassFraction(tNonPromptPsi, "hPsi2S_nonprompt_lxy_fraction_nChargedTracks", hPsiInclFitMult, "nChargedTracks", s);
 		printf("\n[%s] X(3872) lxy efficiency vs nChargedTracks\n", s.system.Data());
-		TH1D* hXEffMult   = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_nChargedTracks", hXInclFitMult, "nChargedTracks", s, s.lxyCutX);
+		TH1D* hXEffMult   = LxyPassFraction(tNonPromptX, "hX3872_nonprompt_lxy_fraction_nChargedTracks", hXInclFitMult, "nChargedTracks", s);
 
 		hPsiFrac     = EmptyLike(hPsiInclFit, "hPsi2S_dataDriven_nonprompt_fraction_Bpt", ";p_{T} [GeV/c];f_{nonprompt}");
 		hXFrac       = EmptyLike(hXInclFit, "hX3872_dataDriven_nonprompt_fraction_Bpt", ";p_{T} [GeV/c];f_{nonprompt}");
@@ -112,8 +112,7 @@ void plot_nonPrompt_fraction(TString systemNAME = "ppRef", bool inclusiveOnly = 
 	out << "System: " << s.system.Data() << "\n";
 	out << "Base cut: " << s.baseCut.Data() << "\n";
 	out << "lxy expression: " << s.lxyExpr.Data() << "\n";
-	out << "lxy cut psi(2S) [cm]: " << s.lxyCutPsi << "\n";
-	out << "lxy cut X(3872) [cm]: " << s.lxyCutX << "\n";
+	out << "lxy cut [cm]: " << s.lxyCut << "\n";
 	out << "MC weight: pThatreweight\n";
 
 	printf("\n[%s] data-driven nonprompt fractions\n", s.system.Data());
@@ -145,12 +144,18 @@ void plot_nonPrompt_fraction(TString systemNAME = "ppRef", bool inclusiveOnly = 
 	}
 	TObjString baseCutObj(s.baseCut);
 	TObjString lxyExprObj(s.lxyExpr);
-	TParameter<double> lxyCutPsiPar("lxyCutPsi2S_cm", s.lxyCutPsi);
-	TParameter<double> lxyCutXPar("lxyCutX3872_cm", s.lxyCutX);
+	TParameter<double> lxyCutPar("lxyCut_cm", s.lxyCut);
+	TParameter<double> lxyPromptMinPar("lxyPromptMin_cm", s.lxyPromptMin);
+	TParameter<double> lxyPromptMaxPar("lxyPromptMax_cm", s.lxyPromptMax);
+	TParameter<double> lxyNonPromptMinPar("lxyNonPromptMin_cm", s.lxyNonPromptMin);
+	TParameter<double> lxyNonPromptMaxPar("lxyNonPromptMax_cm", s.lxyNonPromptMax);
 	baseCutObj.Write("baseCut");
 	lxyExprObj.Write("lxyExpression");
-	lxyCutPsiPar.Write();
-	lxyCutXPar.Write();
+	lxyCutPar.Write();
+	lxyPromptMinPar.Write();
+	lxyPromptMaxPar.Write();
+	lxyNonPromptMinPar.Write();
+	lxyNonPromptMaxPar.Write();
 	fOut.Close();
 
 	// ---------------------------------------------------------------------------- plots

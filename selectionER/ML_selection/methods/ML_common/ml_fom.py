@@ -50,7 +50,7 @@ def fom_settings(c):
         "working_point": "Punzi maximum on all signal MC and all DATA, B counted in the Punzi sidebands (optimalCUT_X_punzi.C)",
         "ks_pvalue_min": settings.KS_PVALUE_MIN,
         "max_auc_gap": settings.MAX_AUC_GAP,
-        "auc_gap_sigma": settings.AUC_GAP_SIGMA,
+        "auc_gap_sigma": c["auc_gap_sigma"],
         "validation_fraction": VALIDATION_FRACTION,
         "test_fraction": TEST_FRACTION,
         **({"sideband_sides": list(c["punzi_sides"])} if len(c["punzi_sides"]) == 1 else {}),
@@ -200,8 +200,8 @@ def evaluate(train, other, window_bkg, c, threshold=None):
     train and other are (y, score, w, bmass) tuples. The working point is the Punzi-optimal
     threshold of `other`, or `threshold` when given; signal and background efficiencies
     at the working point are compared between the two sets. The model passes when the AUC gap is at
-    most MAX_AUC_GAP or AUC_GAP_SIGMA times its statistical uncertainty, whichever is larger, and both
-    weighted KS p-values (effective sample sizes (sum w)^2 / sum w^2) are at least KS_PVALUE_MIN.
+    most MAX_AUC_GAP or c["auc_gap_sigma"] (AUC_GAP_SIGMA of the tree) times its statistical uncertainty,
+    whichever is larger, and both weighted KS p-values (effective sample sizes (sum w)^2 / sum w^2) are at least KS_PVALUE_MIN.
     """
     y_train, score_train, w_train, _ = train
     y_other, score_other, w_other, bmass_other = other
@@ -217,7 +217,7 @@ def evaluate(train, other, window_bkg, c, threshold=None):
         q1, q2 = auc / (2.0 - auc), 2.0 * auc**2 / (1.0 + auc)
         variance += (auc * (1.0 - auc) + (n_s - 1.0) * (q1 - auc**2) + (n_b - 1.0) * (q2 - auc**2)) / (n_s * n_b)
     result["auc_gap_error"] = float(np.sqrt(variance))
-    result["auc_gap_limit"] = max(settings.MAX_AUC_GAP, settings.AUC_GAP_SIGMA * result["auc_gap_error"])
+    result["auc_gap_limit"] = max(settings.MAX_AUC_GAP, c["auc_gap_sigma"] * result["auc_gap_error"])
     result["working_point"] = result["punzi_threshold"] if threshold is None else float(threshold)
     for name, label in (("signal", 1), ("background", 0)):
         in_train = y_train == label

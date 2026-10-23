@@ -124,7 +124,9 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     Int_t RunNo, LumiNo, Bsize, CentBin;
     ULong64_t EvtNo;
     Float_t PVx, PVy, PVz, PVxE, PVyE, PVzE, PVnchi2;
-    Float_t nChargedTracks, nChargedTracks_LOOSE, nChargedTracks_TIGHT;
+    Int_t nPV;
+    Int_t puFilterOlv, puFilterGplus, puFilterVtx1;  // ppRef pileup flags: 1 = no pileup vertex, 0 = pileup, -1 = not run
+    Float_t nChargedTracks, nChargedTracks_LOOSE, nChargedTracks_TIGHT, nChargedTracks_UNCORR;
     static Int_t Bindex[MAXCAND];
     static Float_t Bmass[MAXCAND], Bpt[MAXCAND], By[MAXCAND], Bgen[MAXCAND];
     static Float_t BvtxX[MAXCAND], BvtxY[MAXCAND];
@@ -160,6 +162,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     static Float_t BQvalue[MAXCAND];
     static Float_t Bnorm_svpvDistance_2D[MAXCAND];
     static Float_t BsvpvDistance_2D[MAXCAND];
+    static Float_t Bmu1p[MAXCAND];
+    static Float_t Bmu2p[MAXCAND];
+    static Float_t Bchi2ndf[MAXCAND];
+    static Float_t BsvpvDistance[MAXCAND];
+    static Float_t BsvpvDisErr[MAXCAND];
+    static Float_t Bnorm_svpvDistance[MAXCAND];
     static Float_t BsvpvDisErr_2D[MAXCAND];
     static Float_t Balpha[MAXCAND];
     static Float_t Bdtheta[MAXCAND];
@@ -211,9 +219,20 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tin->SetBranchAddress("PVyE", &PVyE);
     tin->SetBranchAddress("PVzE", &PVzE);
     tin->SetBranchAddress("PVnchi2", &PVnchi2);
+    // Branches added after some productions (e.g. PbPb): if absent, keep the value -1.
+    const auto setOptionalBranch = [&](const char *name, auto *address) {
+        *address = -1;
+        if (tin->GetBranch(name)) tin->SetBranchAddress(name, address);
+        else std::cout << "Branch " << name << " not in input: filled with -1" << std::endl;
+    };
+    setOptionalBranch("nPV", &nPV);
+    setOptionalBranch("puFilterOlv", &puFilterOlv);
+    setOptionalBranch("puFilterGplus", &puFilterGplus);
+    setOptionalBranch("puFilterVtx1", &puFilterVtx1);
     tin->SetBranchAddress("nChargedTracks", &nChargedTracks);
     tin->SetBranchAddress("nChargedTracks_LOOSE", &nChargedTracks_LOOSE);
     tin->SetBranchAddress("nChargedTracks_TIGHT", &nChargedTracks_TIGHT);
+    setOptionalBranch("nChargedTracks_UNCORR", &nChargedTracks_UNCORR);
     tin->SetBranchAddress("CentBin", &CentBin);
     Float_t pthat = 0.;
     if (isMC) tin->SetBranchAddress("pthat", &pthat);
@@ -256,6 +275,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tin->SetBranchAddress("BQvalue", BQvalue);
     tin->SetBranchAddress("Bnorm_svpvDistance_2D", Bnorm_svpvDistance_2D);
     tin->SetBranchAddress("BsvpvDistance_2D", BsvpvDistance_2D);
+    tin->SetBranchAddress("Bmu1p", Bmu1p);
+    tin->SetBranchAddress("Bmu2p", Bmu2p);
+    tin->SetBranchAddress("Bchi2ndf", Bchi2ndf);
+    tin->SetBranchAddress("BsvpvDistance", BsvpvDistance);
+    tin->SetBranchAddress("BsvpvDisErr", BsvpvDisErr);
+    tin->SetBranchAddress("Bnorm_svpvDistance", Bnorm_svpvDistance);
     tin->SetBranchAddress("BsvpvDisErr_2D", BsvpvDisErr_2D);
     tin->SetBranchAddress("Balpha", Balpha);
     tin->SetBranchAddress("Bdtheta", Bdtheta);
@@ -303,11 +328,14 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     Long64_t eventIndex_out;
     int nCandPassPreselection_out, nCandPassFiducial_out, nCandWritten_out;
     float PVx_out, PVy_out, PVz_out, PVxE_out, PVyE_out, PVzE_out, PVnchi2_out;
-    float nChargedTracks_out, nChargedTracks_LOOSE_out, nChargedTracks_TIGHT_out;
+    int nPV_out;
+    int puFilterOlv_out, puFilterGplus_out, puFilterVtx1_out;
+    float nChargedTracks_out, nChargedTracks_LOOSE_out, nChargedTracks_TIGHT_out, nChargedTracks_UNCORR_out;
     float Bmass_out, Bpt_out, By_out, Bchi2Prob_out, Btrk1dR_out, Btrk2dR_out, BtrkPtimb_out, Btktkpt_out, Bujmass_out, Bnorm_svpvDistance_2D_out;
     float BQvalue_out, Bnorm_trk1Dxy_out, Bnorm_trk2Dxy_out, Balpha_out, Bdtheta_out, Bcos_dtheta_out, Btktkmass_out, Btrk1Pt_out, Btrk2Pt_out;
     float Bgen_out, BsvpvDistance_2D_out, BtktkvProb_out, BLxy_out;
     float BvtxX_out, BvtxY_out, BsvpvDisErr_2D_out;
+    float Bmu1p_out, Bmu2p_out, Bchi2ndf_out, BsvpvDistance_out, BsvpvDisErr_out, Bnorm_svpvDistance_out;
     float Btrk1Eta_out, Btrk2Eta_out, Btrk1Phi_out, Btrk2Phi_out, Btrk1PtErr_out, Btrk2PtErr_out;
     float BujvProb_out, Bmu1pt_out, Bmu2pt_out, Bnorm_trk1Dz_out, Bnorm_trk2Dz_out;
     float Bmu1eta_out, Bmu2eta_out, Bmu1phi_out, Bmu2phi_out;
@@ -345,9 +373,14 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tout->Branch("PVyE", &PVyE_out, "PVyE/F");
     tout->Branch("PVzE", &PVzE_out, "PVzE/F");
     tout->Branch("PVnchi2", &PVnchi2_out, "PVnchi2/F");
+    tout->Branch("nPV", &nPV_out, "nPV/I");
+    tout->Branch("puFilterOlv", &puFilterOlv_out, "puFilterOlv/I");
+    tout->Branch("puFilterGplus", &puFilterGplus_out, "puFilterGplus/I");
+    tout->Branch("puFilterVtx1", &puFilterVtx1_out, "puFilterVtx1/I");
     tout->Branch("nChargedTracks", &nChargedTracks_out, "nChargedTracks/F");
     tout->Branch("nChargedTracks_LOOSE", &nChargedTracks_LOOSE_out, "nChargedTracks_LOOSE/F");
     tout->Branch("nChargedTracks_TIGHT", &nChargedTracks_TIGHT_out, "nChargedTracks_TIGHT/F");
+    tout->Branch("nChargedTracks_UNCORR", &nChargedTracks_UNCORR_out, "nChargedTracks_UNCORR/F");
     tout->Branch("CentBin", &CentBin_out, "CentBin/I");
     tout->Branch("Bmass", &Bmass_out, "Bmass/F");
     tout->Branch("Bpt", &Bpt_out, "Bpt/F");
@@ -361,6 +394,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tout->Branch("BujvProb", &BujvProb_out, "BujvProb/F");
     tout->Branch("Bnorm_svpvDistance_2D", &Bnorm_svpvDistance_2D_out, "Bnorm_svpvDistance_2D/F");
     tout->Branch("BsvpvDistance_2D", &BsvpvDistance_2D_out, "BsvpvDistance_2D/F");
+    tout->Branch("Bmu1p", &Bmu1p_out, "Bmu1p/F");
+    tout->Branch("Bmu2p", &Bmu2p_out, "Bmu2p/F");
+    tout->Branch("Bchi2ndf", &Bchi2ndf_out, "Bchi2ndf/F");
+    tout->Branch("BsvpvDistance", &BsvpvDistance_out, "BsvpvDistance/F");
+    tout->Branch("BsvpvDisErr", &BsvpvDisErr_out, "BsvpvDisErr/F");
+    tout->Branch("Bnorm_svpvDistance", &Bnorm_svpvDistance_out, "Bnorm_svpvDistance/F");
     tout->Branch("BsvpvDisErr_2D", &BsvpvDisErr_2D_out, "BsvpvDisErr_2D/F");
     tout->Branch("BQvalue", &BQvalue_out, "BQvalue/F");
     tout->Branch("Bnorm_trk1Dxy", &Bnorm_trk1Dxy_out, "Bnorm_trk1Dxy/F");
@@ -458,9 +497,14 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
     tevent->Branch("PVyE", &PVyE_out, "PVyE/F");
     tevent->Branch("PVzE", &PVzE_out, "PVzE/F");
     tevent->Branch("PVnchi2", &PVnchi2_out, "PVnchi2/F");
+    tevent->Branch("nPV", &nPV_out, "nPV/I");
+    tevent->Branch("puFilterOlv", &puFilterOlv_out, "puFilterOlv/I");
+    tevent->Branch("puFilterGplus", &puFilterGplus_out, "puFilterGplus/I");
+    tevent->Branch("puFilterVtx1", &puFilterVtx1_out, "puFilterVtx1/I");
     tevent->Branch("nChargedTracks", &nChargedTracks_out, "nChargedTracks/F");
     tevent->Branch("nChargedTracks_LOOSE", &nChargedTracks_LOOSE_out, "nChargedTracks_LOOSE/F");
     tevent->Branch("nChargedTracks_TIGHT", &nChargedTracks_TIGHT_out, "nChargedTracks_TIGHT/F");
+    tevent->Branch("nChargedTracks_UNCORR", &nChargedTracks_UNCORR_out, "nChargedTracks_UNCORR/F");
     tevent->Branch("CentBin", &CentBin_out, "CentBin/I");
     tevent->Branch("nCandPassPreselection", &nCandPassPreselection_out, "nCandPassPreselection/I");
     tevent->Branch("nCandPassFiducial", &nCandPassFiducial_out, "nCandPassFiducial/I");
@@ -504,10 +548,15 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
         PVyE_out = PVyE;
         PVzE_out = PVzE;
         PVnchi2_out = PVnchi2;
+        nPV_out = nPV;
+        puFilterOlv_out = puFilterOlv;
+        puFilterGplus_out = puFilterGplus;
+        puFilterVtx1_out = puFilterVtx1;
         CentBin_out = CentBin;
         nChargedTracks_out = nChargedTracks;
         nChargedTracks_LOOSE_out = nChargedTracks_LOOSE;
         nChargedTracks_TIGHT_out = nChargedTracks_TIGHT;
+        nChargedTracks_UNCORR_out = nChargedTracks_UNCORR;
         nCandPassPreselection_out = 0;
         nCandPassFiducial_out = 0;
         nCandWritten_out = 0;
@@ -521,6 +570,9 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
             // DATA is already filtered (except for the cuts marked with <-------- ** ); 
             // MC is not.
             if (true){
+                // Primary vertex: same requirement as the data-only primaryVertexFilter, on Bfinder's PV,
+                // so that data and MC get an identical definition
+                if (!(std::abs(PVz) <= 25. && std::sqrt(PVx * PVx + PVy * PVy) <= 2.)) continue;
                 // Muons
                 // Muon Trigger matching   <-------- **
                 if(isPP && !(Bmu1isTriggered[i] && Bmu2isTriggered[i] )) continue;
@@ -586,6 +638,12 @@ void Flat_TREEs( TString FILEIN="", TString NUN="", TString TREENAME="ntmix", TS
             BujvProb_out  = BujvProb[i];
             Bnorm_svpvDistance_2D_out = Bnorm_svpvDistance_2D[i];
             BsvpvDistance_2D_out = BsvpvDistance_2D[i];
+            Bmu1p_out = Bmu1p[i];
+            Bmu2p_out = Bmu2p[i];
+            Bchi2ndf_out = Bchi2ndf[i];
+            BsvpvDistance_out = BsvpvDistance[i];
+            BsvpvDisErr_out = BsvpvDisErr[i];
+            Bnorm_svpvDistance_out = Bnorm_svpvDistance[i];
             BsvpvDisErr_2D_out = BsvpvDisErr_2D[i];
             BQvalue_out = BQvalue[i];
             Bnorm_trk1Dxy_out = Bnorm_trk1Dxy[i];

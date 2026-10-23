@@ -1,16 +1,19 @@
 #pragma once
 
+#include <stdexcept>
 #include <vector>
 
 #include <TAxis.h>
 #include <TBox.h>
 #include <TCanvas.h>
+#include <TError.h>
 #include <TFile.h>
 #include <TH1D.h>
 #include <TLatex.h>
 #include <TLegend.h>
 #include <TLine.h>
 #include <TMath.h>
+#include <TObjString.h>
 #include <TString.h>
 #include <TTree.h>
 
@@ -27,13 +30,12 @@ struct NonPromptSetup {
 	TString baseCut;          // the complete rectangular selection, pT window included
 	TString lxyExpr;          // displacement variable used to enrich the B component
 	TString lxyLabel;         // how that variable is written on the axes
-	double  lxyCutPsi;        // [cm]  -> fitER/<...>Psi2SdoRoofit_nonPrompt.sh
-	double  lxyCutX;          // [cm]  -> fitER/<...>X3872doRoofit_nonPrompt.sh
+	double  lxyCut;           // [cm]  -> fitER/*doRoofit_nonPrompt.sh
 	TString ptLabel;          // caption only, never part of a selection
-	int     lxyNonPromptBins; // axis of the nonprompt lxy panel; the prompt panel is
-	double  lxyNonPromptMin;  // -0.2 -- 0.2 in both systems and stays hardcoded
+	double  lxyPromptMin;
+	double  lxyPromptMax;
+	double  lxyNonPromptMin;
 	double  lxyNonPromptMax;
-	TString collisionText;
 	TString fitDir;           // inclusive (prompt+nonprompt) fits
 	TString fitDirNonPrompt;  // B-enriched (lxy cut) fits
 	TString outDir;
@@ -56,29 +58,48 @@ inline NonPromptSetup NonPromptSetupFor(TString systemNAME)
 		s.promptX       = dir + "/flat_ntmix_PbPb23_MC_X3872.root";
 		s.nonPromptPsi  = dir + "/flat_ntmix_PbPb23_MC_PSI2S_nonPrompt.root";
 		s.nonPromptX    = dir + "/flat_ntmix_PbPb23_MC_X3872_nonPrompt.root";
-		s.baseCut       = "(Bpt > 15 && Bpt < 50) && (abs(By) < 1.6) && (BQvalue < 0.15) && Btrk2dR <= 0.25 && Score > 0.85";
-		s.lxyCutPsi     = 0.01;
-		s.lxyCutX       = 0.01;
-		s.ptLabel       = "15 < p_{T} < 50 GeV/c";
-		s.lxyNonPromptBins = 50;
+		s.lxyCut        = 0.005;
+		s.ptLabel       = "15 < p_{T} < 50 GeV";
+		s.lxyPromptMin     = -0.0055;
+		s.lxyPromptMax     = 0.0055;
 		s.lxyNonPromptMin  = -0.02;
 		s.lxyNonPromptMax  = 0.5;
-		s.collisionText = "PbPb #sqrt{s_{NN}}=5.36 TeV";
 	} else {
 		const TString dir = "/eos/user/h/hmarques/RUN3_Data_MC_sharing/X3872/ppRef24";
 		s.promptPsi     = dir + "/flat_ntmix_ppRef_MC_PSI2S.root";
 		s.promptX       = dir + "/flat_ntmix_ppRef_MC_X3872.root";
 		s.nonPromptPsi  = dir + "/flat_ntmix_ppRef_MC_PSI2S_nonPrompt.root";
 		s.nonPromptX    = dir + "/flat_ntmix_ppRef_MC_X3872_nonPrompt.root";
-		s.baseCut       = "BQvalue < 0.15 && Btrk1dR < .5 && Btrk2dR < .5 && (Bpt >= 7.5 && Bpt < 50)";
-		s.lxyCutPsi     = 0.03;
-		s.lxyCutX       = 0.03;
-		s.ptLabel       = "7.5 #leq p_{T} < 50 GeV/c";
-		s.lxyNonPromptBins = 50;
-		s.lxyNonPromptMin  = -0.2;
+		s.lxyCut        = 0.005;
+		s.ptLabel       = "7.5 #leq p_{T} < 50 GeV";
+		s.lxyPromptMin     = -0.02;
+		s.lxyPromptMax     = 0.02;
+		s.lxyNonPromptMin  = -0.1;
 		s.lxyNonPromptMax  = .5;
-		s.collisionText = "pp #sqrt{s}=5.36 TeV";
 	}
+
+	const TString inclusiveFitPath = Form("%s/nominalFitModel_ntmix_PSI2S_%s.root",
+	                                       s.fitDir.Data(), s.system.Data());
+	TFile* inclusiveFit = TFile::Open(inclusiveFitPath, "READ");
+	if (!inclusiveFit || inclusiveFit->IsZombie()) {
+		::Warning("NonPromptSetupFor",
+		          "Run the inclusive psi(2S) fit first; its metadata is required: %s",
+		          inclusiveFitPath.Data());
+		throw std::runtime_error("Missing inclusive fit metadata");
+	}
+	TObjString* selectionCut = nullptr;
+	inclusiveFit->GetObject("selectionCut", selectionCut);
+	if (!selectionCut) { // these warnings must stay for smothness of future calls
+		::Warning("NonPromptSetupFor",
+		          "Run the inclusive psi(2S) fit again; selectionCut is missing from: %s",
+		          inclusiveFitPath.Data());
+		inclusiveFit->Close();
+		delete inclusiveFit;
+		throw std::runtime_error("Missing selectionCut metadata");
+	}
+	s.baseCut = selectionCut->GetString();
+	inclusiveFit->Close();
+	delete inclusiveFit;
 	return s;
 }
 
@@ -132,15 +153,15 @@ inline TH1D* EmptyLike(const TH1D* ref, TString name, TString title)
 
 // Fraction of nonprompt MC surviving the lxy cut, bin by bin of ref.
 inline TH1D* LxyPassFraction(TTree* tree, TString name, const TH1D* ref, TString varExpr,
-                             const NonPromptSetup& s, double lxyCut)
+                             const NonPromptSetup& s)
 {
-	TH1D* h = EmptyLike(ref, name, Form(";%s;N(%s > %g cm) / N", varExpr.Data(), s.lxyLabel.Data(), lxyCut));
+	TH1D* h = EmptyLike(ref, name, Form(";%s;N(%s > %g cm) / N", varExpr.Data(), s.lxyLabel.Data(), s.lxyCut));
 	for (int i = 1; i <= h->GetNbinsX(); ++i) {
 		const double lo = h->GetXaxis()->GetBinLowEdge(i);
 		const double hi = h->GetXaxis()->GetBinUpEdge(i);
 		const TString binCut = Form("%s >= %.8f && %s < %.8f", varExpr.Data(), lo, varExpr.Data(), hi);
 		const TString den = Form("(%s) && (%s)", s.baseCut.Data(), binCut.Data());
-		const TString num = Form("(%s) && (%s > %.6f)", den.Data(), s.lxyExpr.Data(), lxyCut);
+		const TString num = Form("(%s) && (%s > %.6f)", den.Data(), s.lxyExpr.Data(), s.lxyCut);
 		const WeightedCount d = WeightedEntries(tree, den);
 		const WeightedCount n = WeightedEntries(tree, num);
 		const double f = (d.sumW > 0.) ? n.sumW / d.sumW : 0.;
@@ -199,74 +220,96 @@ inline void DrawFractionCanvas(TH1D& hPsi, TH1D& hX, TH1D& hPsiIncl, TH1D& hXInc
                                TString xTitle, TString outPdf,
                                const NonPromptSetup& s, bool drawBinnedPoints)
 {
-	hPsi.SetLineColor(kOrange - 2);   hPsi.SetMarkerColor(kOrange - 2);
-	hPsi.SetMarkerStyle(20);          hPsi.SetMarkerSize(1.0);
-	hPsi.SetLineWidth(3);             hPsi.SetStats(0);
-	hX.SetLineColor(kOrange - 3);     hX.SetMarkerColor(kOrange - 3);
-	hX.SetMarkerStyle(21);            hX.SetMarkerSize(1.0);
-	hX.SetLineWidth(3);               hX.SetStats(0);
-
-	double yMax = 0.;
-	if (drawBinnedPoints) {
-		for (int i = 1; i <= hPsi.GetNbinsX(); ++i) {
-			yMax = TMath::Max(yMax, hPsi.GetBinContent(i) + hPsi.GetBinError(i));
-			yMax = TMath::Max(yMax, hX.GetBinContent(i) + hX.GetBinError(i));
+	TH1D* hPsiPrompt = (TH1D*) hPsi.Clone(Form("%s_prompt", hPsi.GetName()));
+	TH1D* hXPrompt = (TH1D*) hX.Clone(Form("%s_prompt", hX.GetName()));
+	TH1D* hPsiInclPrompt = (TH1D*) hPsiIncl.Clone(Form("%s_prompt", hPsiIncl.GetName()));
+	TH1D* hXInclPrompt = (TH1D*) hXIncl.Clone(Form("%s_prompt", hXIncl.GetName()));
+	for (TH1D* h : {hPsiPrompt, hXPrompt, hPsiInclPrompt, hXInclPrompt}) {
+		h->SetDirectory(nullptr);
+		for (int i = 1; i <= h->GetNbinsX(); ++i) {
+			h->SetBinContent(i, 1. - h->GetBinContent(i));
 		}
 	}
-	yMax = TMath::Max(yMax, hPsiIncl.GetBinContent(1) + hPsiIncl.GetBinError(1));
-	yMax = TMath::Max(yMax, hXIncl.GetBinContent(1) + hXIncl.GetBinError(1));
-	yMax = TMath::Max(1.25, 1.35 * yMax);
 
-	const double xLow = hPsi.GetXaxis()->GetXmin();
-	const double xHigh = hPsi.GetXaxis()->GetXmax();
-	TH1D* frame = EmptyLike(&hPsi, "hFractionFrame", Form(";%s;f_{nonprompt}", xTitle.Data()));
-	frame->SetMinimum(0.);
-	frame->SetMaximum(yMax);
-	frame->GetXaxis()->SetTitleSize(0.045);
-	frame->GetYaxis()->SetTitleSize(0.050);
-	frame->GetYaxis()->SetTitleOffset(1.15);
+	auto drawPage = [&](TH1D& pagePsi, TH1D& pageX,
+	                    TH1D& pagePsiIncl, TH1D& pageXIncl,
+	                    TString yTitle, TString pdfName) {
+		pagePsi.SetLineColor(kOrange - 2);   pagePsi.SetMarkerColor(kOrange - 2);
+		pagePsi.SetMarkerStyle(20);          pagePsi.SetMarkerSize(1.0);
+		pagePsi.SetLineWidth(3);             pagePsi.SetStats(0);
+		pageX.SetLineColor(kOrange - 3);     pageX.SetMarkerColor(kOrange - 3);
+		pageX.SetMarkerStyle(21);            pageX.SetMarkerSize(1.0);
+		pageX.SetLineWidth(3);               pageX.SetStats(0);
 
-	TCanvas c("cFraction", "", 700, 700);
-	c.SetLeftMargin(0.15);
-	c.SetRightMargin(0.05);
-	c.SetTopMargin(0.07);
-	c.SetBottomMargin(0.12);
-	frame->Draw("AXIS");
-	TLine* psiInclusiveLine = DrawInclusiveBand(hPsiIncl, kOrange - 2, xLow, xHigh);
-	TLine* xInclusiveLine = DrawInclusiveBand(hXIncl, kOrange - 3, xLow, xHigh);
-	if (drawBinnedPoints) {
-		hPsi.Draw("E1 SAME");
-		hX.Draw("E1 SAME");
-	}
-	frame->Draw("AXIS SAME");
+		double yMax = 0.;
+		if (drawBinnedPoints) {
+			for (int i = 1; i <= pagePsi.GetNbinsX(); ++i) {
+				yMax = TMath::Max(yMax, pagePsi.GetBinContent(i) + pagePsi.GetBinError(i));
+				yMax = TMath::Max(yMax, pageX.GetBinContent(i) + pageX.GetBinError(i));
+			}
+		}
+		yMax = TMath::Max(yMax, pagePsiIncl.GetBinContent(1) + pagePsiIncl.GetBinError(1));
+		yMax = TMath::Max(yMax, pageXIncl.GetBinContent(1) + pageXIncl.GetBinError(1));
+		yMax = TMath::Max(1.25, 1.35 * yMax);
 
-	TLegend leg(0.58, 0.68, 0.93, 0.82);
-	leg.SetBorderSize(0);
-	leg.SetFillStyle(0);
-	leg.SetTextFont(42);
-	leg.SetTextSize(0.032);
-	if (drawBinnedPoints) {
-		leg.AddEntry(&hPsi, "#psi(2S)", "lep");
-		leg.AddEntry(&hX, "X(3872)", "lep");
-		leg.AddEntry((TObject*)0, "Dashed bands: inclusive", "");
-	} else {
-		leg.AddEntry(psiInclusiveLine, "#psi(2S) inclusive", "l");
-		leg.AddEntry(xInclusiveLine, "X(3872) inclusive", "l");
-	}
-	leg.Draw();
+		const double xLow = pagePsi.GetXaxis()->GetXmin();
+		const double xHigh = pagePsi.GetXaxis()->GetXmax();
+		TH1D* frame = EmptyLike(&pagePsi, "hFractionFrame", Form(";%s;%s", xTitle.Data(), yTitle.Data()));
+		frame->SetMinimum(0.);
+		frame->SetMaximum(yMax);
+		frame->GetXaxis()->SetTitleSize(0.045);
+		frame->GetYaxis()->SetTitleSize(0.050);
+		frame->GetYaxis()->SetTitleOffset(1.15);
 
-	TLatex text;
-	text.SetNDC();
-	text.SetTextFont(42);
-	text.SetTextSize(0.042);
-	text.SetTextAlign(11);
-	text.DrawLatex(0.16, 0.95, "#bf{CMS} #it{Preliminary}");
-	text.SetTextAlign(31);
-	text.SetTextSize(0.035);
-	text.DrawLatex(0.95, 0.95, s.collisionText);
-	text.SetTextSize(0.040);
-	text.DrawLatex(0.93, 0.87, "#bf{B-enriched method}");
-	text.SetTextSize(0.035);
-	text.DrawLatex(0.93, 0.63, s.ptLabel);
-	c.SaveAs(outPdf);
+		TCanvas c("cFraction", "", 700, 700);
+		c.SetLeftMargin(0.15);
+		c.SetRightMargin(0.05);
+		c.SetTopMargin(0.07);
+		c.SetBottomMargin(0.12);
+		frame->Draw("AXIS");
+		TLine* psiInclusiveLine = DrawInclusiveBand(pagePsiIncl, kOrange - 2, xLow, xHigh);
+		TLine* xInclusiveLine = DrawInclusiveBand(pageXIncl, kOrange - 3, xLow, xHigh);
+		if (drawBinnedPoints) {
+			pagePsi.Draw("E1 SAME");
+			pageX.Draw("E1 SAME");
+		}
+		frame->Draw("AXIS SAME");
+
+		TLegend leg(0.58, 0.68, 0.93, 0.82);
+		leg.SetBorderSize(0);
+		leg.SetFillStyle(0);
+		leg.SetTextFont(42);
+		leg.SetTextSize(0.032);
+		if (drawBinnedPoints) {
+			leg.AddEntry(&pagePsi, "#psi(2S)", "lep");
+			leg.AddEntry(&pageX, "X(3872)", "lep");
+		} else {
+			leg.AddEntry(psiInclusiveLine, "#psi(2S)", "l");
+			leg.AddEntry(xInclusiveLine, "X(3872)", "l");
+		}
+		leg.Draw();
+
+		TLatex text;
+		text.SetNDC();
+		text.SetTextFont(42);
+		text.SetTextSize(0.042);
+		text.SetTextAlign(11);
+		text.DrawLatex(0.16, 0.95, "#bf{CMS} #it{Preliminary}");
+		text.SetTextAlign(31);
+		text.SetTextSize(0.040);
+		text.DrawLatex(0.93, 0.87, "#bf{B-enriched method}");
+		text.SetTextAlign(11);
+		text.SetTextSize(0.035);
+		text.DrawLatex(0.58, 0.63, s.ptLabel);
+		c.Print(pdfName);
+	};
+
+	drawPage(hPsi, hX, hPsiIncl, hXIncl, "f_{nonprompt}", outPdf + "(");
+	drawPage(*hPsiPrompt, *hXPrompt, *hPsiInclPrompt, *hXInclPrompt,
+	         "f_{prompt}", outPdf + ")");
+
+	delete hPsiPrompt;
+	delete hXPrompt;
+	delete hPsiInclPrompt;
+	delete hXInclPrompt;
 }

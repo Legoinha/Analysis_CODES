@@ -1,11 +1,12 @@
 # selectionER: ML selection and threshold optimization
 
-Three classifiers (NN, XGBoost, TMVA BDTG; the B mesons use the first two) separate signal MC from DATA in the mass sidebands, for
+Three classifiers (NN, XGBoost, TMVA BDTG; every tree uses the first two at present, `ML_METHODS`) separate signal MC from DATA in the mass sidebands, for
 every **case**: one candidate tree in one data set, named `<tree>/<year>`.
 
 | tree | signal | years | MC of PbPb24 | pre-cut | sidebands | feature-study pool | forward selection, final check |
 |---|---|---|---|---|---|---|---|
-| `ntmix` | prompt X(3872) → J/ψ ρ | PbPb18, PbPb23, PbPb24 | PbPb23 | 15 < pT < 50, \|y\| < 1.6, BQ < 0.15, Bχ²Prob | both | BtrkLeadPt BtrkMaxdR BtrkSubPt BmuLeadPt BmuMaxdR | on |
+| `ntmix` | prompt X(3872) → J/ψ ρ | PbPb18 | — | 15 < pT < 50, \|y\| < 1.6, BQ < 0.15, Bχ²Prob > 0.10 | both | BtrkLeadPt BtrkSubPt BtrkMaxdR BmuLeadPt Bpt BmuMaxdR | off |
+| `ntmix` | prompt X(3872) → J/ψ ρ | Run 3, `<year>_<region>` with region `pt10y24`, `pt15y16`, `pt10y16` (pT > 10 or 15, \|y\| < 2.4 or 1.6): `PbPb25` (own MC), `PbPb23/24/25_mc2325` (PbPb23 official + PbPb25 private MC merged) | — | pT < 50, BQ < 0.15, Btrk2dR < 0.3 | both | PbPb25: Btrk1dR Btrk2Pt Btrk1Pt Bmu1pt; mc2325: BtrkLeadPt BtrkSubPt BtrkMaxdR BmuLeadPt (also the production features, raw for every method) | off |
 | `ntKp` | B+ → J/ψ K+ | PbPb23, PbPb24, ppRef | PbPb23 | 7.5 < pT < 50, \|y\| < 2.4, Bχ²Prob > 0.05 | high only | Balpha_log Bchi2Prob Bnorm_svpvDistance_2D_log Bnorm_trk1Dxy Btrk1Pt_log Bujeta Btrk1dR | off |
 | `ntphi` | Bs → J/ψ φ | PbPb23, PbPb24 | PbPb23 | 7.5 < pT < 50, \|y\| < 2.4, Bχ²Prob > 0.05 | both | as ntKp | off |
 | `ntKstar` | B0 → J/ψ K*0 | PbPb23, PbPb24 | PbPb23 | 7.5 < pT < 50, \|y\| < 2.4, Bχ²Prob > 0.05 | both | as ntKp | off |
@@ -25,7 +26,8 @@ the mass-decorrelated features by default (`DECORRELATE`).
 files, pre-cuts and pT bins, the production features and pool of each tree, the mass regions of each
 tree (peak, Punzi window and sidebands, training sidebands, decorrelation and sculpting regions), the
 sample sizes and the model-selection settings. A new case (ntmix/ppRef when its MC is ready, ppRef Bs
-and B0, ...) is one more entry of `CASES`. TMVA and `optimalCUT_X_punzi.C` read the C++ copy
+and B0, ...) is one more entry of `CASES`. An entry can also set any per-tree setting (`features`, `pool`,
+`decorrelate`, ...) for itself (the Run 3 ntmix cases). TMVA and `optimalCUT_X_punzi.C` read the C++ copy
 `ML_selection/methods/ML_tmva/ml_settings.h`, which `make_skims.py`, `feature_study.py`,
 `fresh_ML_scan.sh` and `train_best_ML.sh` write again from `settings.py` when they start.
 
@@ -149,9 +151,9 @@ is split into the validation and test parts at random (fixed seed).
   background from 15–35 MeV on both sides scaled by 10/40; the signal MC peak holds 68% within 6 MeV,
   so the window keeps about 60% of it, and only about 2% of the window signal falls in the sidebands.
   B mesons: |m − m_B| < 40 MeV (Bs 25 MeV, about 2σ of the MC peak), background from 100–200 MeV on
-  both sides (B+: the high side only, scaled by 80/100). The Punzi sidebands
-  lie inside the training sidebands (X(3872) 15–50 MeV, B mesons 65–235 MeV from the peak), so their
-  background is counted on all DATA, the training candidates included, exactly as
+  both sides (B+: the high side only, scaled by 80/100). The training
+  sidebands span 20–100 MeV from the peak for the X(3872) and 65–235 MeV for the B mesons; the Punzi background is counted on all DATA,
+  the training candidates included, exactly as
   `optimalCUT_X_punzi.C` counts it on the full DATA. The maximum is taken only over cuts that keep at
   least `PUNZI_MIN_BACKGROUND` (10) background candidates. Otherwise a cut that leaves no validation
   background, and so gets B = 0, would win by chance: that happened for TMVA at 1.7% signal
@@ -165,7 +167,7 @@ is split into the validation and test parts at random (fixed seed).
   statistics only.
 
 **Overtraining is pass/fail, not a penalty.** A model passes when the train-validation AUC gap is at
-most `MAX_AUC_GAP` or `AUC_GAP_SIGMA` times its statistical uncertainty, whichever is larger
+most `MAX_AUC_GAP` or `AUC_GAP_SIGMA` (per tree: X(3872) 3, B mesons 2) times its statistical uncertainty, whichever is larger
 (Hanley-McNeil errors of the two AUCs with the effective entries of each class, within 10% of the
 bootstrap), and the weighted KS p-values of the signal and background scores (train vs validation,
 effective sample sizes `(sum w)^2 / sum w^2`) are both at least `KS_PVALUE_MIN`. The uncertainty matters
@@ -249,7 +251,7 @@ recorded for every model and replayed. A study refuses another `--fom` than its 
     share to 90%; done once. `comparison.json` and `comparison.pdf` compare it with `all`: the trimming,
     the FOMs with their paired differences, the working point, sculpting, spectator efficiencies, both
     DATA mass spectra and both Punzi curves.
-- **Forward selection** (`FORWARD_SELECTION` of the tree: on for ntmix, off for the B mesons). Step 0 is
+- **Forward selection** (`FORWARD_SELECTION` of the tree: off for every tree at present). Step 0 is
   the two most important inputs of `all`; step k tries the step k−1 winner plus each remaining pool
   feature, for at most `MAX_ADDED` = 6 steps. The step winner has the highest validation central FOM
   among the candidates whose refit passes the overtraining test and does not sculpt the mass (R_gap at
@@ -258,7 +260,7 @@ recorded for every model and replayed. A study refuses another `--fom` than its 
   - **Plateau:** the first step whose gain is below 2σ and stays below for 2 steps.
   - **Recommended set:** the smallest path set within 1σ (paired) of the best one.
   - **Replay:** for each FOM, where it would have chosen another candidate.
-- **Final** (`FINAL_CHECK` of the tree: on for ntmix, off for the B mesons): the last selection (the
+- **Final** (`FINAL_CHECK` of the tree: off for every tree at present): the last selection (the
   recommended set, or `trimmed` without the forward selection or when no step-0 candidate passes) with
   the other decorrelation setting: XGB and TMVA with the `_dc` inputs (`final/decorrelation/`), the NN
   with the raw ones (`final/no_decorrelation/`).

@@ -34,10 +34,10 @@ void plot_nonPrompt_lxyShapes(TString systemNAME = "ppRef")
 	TTree* tNonPromptPsi = (TTree*) fNonPromptPsi.Get("ntmix_PSI2S");
 	TTree* tNonPromptX   = (TTree*) fNonPromptX.Get("ntmix_X3872");
 
-	TH1F hPromptPsi("hPromptPsi", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, -0.02, 0.02);
-	TH1F hPromptX("hPromptX", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, -0.02, 0.02);
-	TH1F hNonPromptPsi("hNonPromptPsi", Form(";%s [cm];Events", s.lxyLabel.Data()), s.lxyNonPromptBins, s.lxyNonPromptMin, s.lxyNonPromptMax);
-	TH1F hNonPromptX("hNonPromptX", Form(";%s [cm];Events", s.lxyLabel.Data()), s.lxyNonPromptBins, s.lxyNonPromptMin, s.lxyNonPromptMax);
+	TH1F hPromptPsi("hPromptPsi", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, s.lxyPromptMin, s.lxyPromptMax);
+	TH1F hPromptX("hPromptX", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, s.lxyPromptMin, s.lxyPromptMax);
+	TH1F hNonPromptPsi("hNonPromptPsi", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, s.lxyNonPromptMin, s.lxyNonPromptMax);
+	TH1F hNonPromptX("hNonPromptX", Form(";%s [cm];Events", s.lxyLabel.Data()), 50, s.lxyNonPromptMin, s.lxyNonPromptMax);
 
 	tPromptPsi   ->Draw(Form("%s >> hPromptPsi", s.lxyExpr.Data()), plotCut, "goff");
 	tPromptX     ->Draw(Form("%s >> hPromptX", s.lxyExpr.Data()), plotCut, "goff");
@@ -49,13 +49,25 @@ void plot_nonPrompt_lxyShapes(TString systemNAME = "ppRef")
 	hNonPromptPsi.Scale(1. / hNonPromptPsi.Integral());
 	hNonPromptX.Scale(1. / hNonPromptX.Integral());
 
+	auto lxyPassPercentage = [&](TTree* tree, double cut) {
+		const WeightedCount total = WeightedEntries(tree, s.baseCut);
+		const TString retainedCut = Form("(%s) && (%s > %.8f)",
+		                                 s.baseCut.Data(), s.lxyExpr.Data(), cut);
+		const WeightedCount retained = WeightedEntries(tree, retainedCut);
+		return 100. * retained.sumW / total.sumW;
+	};
+	const double promptPsiRetained = 100. - lxyPassPercentage(tPromptPsi, s.lxyCut);
+	const double promptXRetained = 100. - lxyPassPercentage(tPromptX, s.lxyCut);
+	const double nonPromptPsiRetained = lxyPassPercentage(tNonPromptPsi, s.lxyCut);
+	const double nonPromptXRetained = lxyPassPercentage(tNonPromptX, s.lxyCut);
+
 	hPromptPsi.SetLineColor(kOrange - 2);     hPromptPsi.SetLineWidth(3);     hPromptPsi.SetFillStyle(0);
 	hNonPromptPsi.SetLineColor(kOrange - 2);  hNonPromptPsi.SetLineWidth(3);  hNonPromptPsi.SetFillStyle(0);
 	hPromptX.SetLineColor(kOrange - 3);       hPromptX.SetLineWidth(3);       hPromptX.SetFillStyle(0);
 	hNonPromptX.SetLineColor(kOrange - 3);    hNonPromptX.SetLineWidth(3);    hNonPromptX.SetFillStyle(0);
 
-	// one panel per production mechanism; the two lxy working points are drawn in
-	// the colour of the state they are applied to
+	// One panel per production mechanism. The common lxy working point is shown
+	// by the black dashed line.
 	for (int isNonPrompt = 0; isNonPrompt < 2; ++isNonPrompt) {
 		TH1F& hPsi = isNonPrompt ? hNonPromptPsi : hPromptPsi;
 		TH1F& hX   = isNonPrompt ? hNonPromptX : hPromptX;
@@ -76,24 +88,55 @@ void plot_nonPrompt_lxyShapes(TString systemNAME = "ppRef")
 		hPsi.Draw("HIST");
 		hX.Draw("HIST SAME");
 
-		TLine lPsi(s.lxyCutPsi, yMin, s.lxyCutPsi, yMax);
-		lPsi.SetLineColor(kOrange - 2);
-		lPsi.SetLineStyle(2);
-		lPsi.SetLineWidth(2);
-		lPsi.Draw("SAME");
-		TLine lX(s.lxyCutX, yMin, s.lxyCutX, yMax);
-		lX.SetLineColor(kOrange - 3);
-		lX.SetLineStyle(2);
-		lX.SetLineWidth(2);
-		lX.Draw("SAME");
+		TH1F hPsiShaded(hPsi);
+		TH1F hXShaded(hX);
+		hPsiShaded.SetName(Form("hPsiShaded_%d", isNonPrompt));
+		hXShaded.SetName(Form("hXShaded_%d", isNonPrompt));
+		for (int i = 1; i <= hPsiShaded.GetNbinsX(); ++i) {
+			const bool outsideRetainedRegion = isNonPrompt
+			    ? hPsiShaded.GetBinCenter(i) < s.lxyCut
+			    : hPsiShaded.GetBinCenter(i) >= s.lxyCut;
+			if (outsideRetainedRegion) {
+				hPsiShaded.SetBinContent(i, 0.);
+				hXShaded.SetBinContent(i, 0.);
+			}
+		}
+		hPsiShaded.SetFillColor(kOrange - 2);
+		hPsiShaded.SetFillStyle(3002);
+		hPsiShaded.SetLineWidth(0);
+		hXShaded.SetFillColor(kOrange - 3);
+		hXShaded.SetFillStyle(3002);
+		hXShaded.SetLineWidth(0);
+		hPsiShaded.Draw("HIST SAME");
+		hXShaded.Draw("HIST SAME");
+		hPsi.Draw("HIST SAME");
+		hX.Draw("HIST SAME");
 
-		TLegend leg(0.62, 0.68, 0.93, 0.82);
+		TLine lxyCut(s.lxyCut, yMin, s.lxyCut, yMax);
+		lxyCut.SetLineColor(kBlack);
+		lxyCut.SetLineStyle(2);
+		lxyCut.SetLineWidth(2);
+		lxyCut.Draw("SAME");
+
+		const double legendX1 = isNonPrompt ? 0.48 : 0.18;
+		const double legendX2 = isNonPrompt ? 0.93 : 0.62;
+		TLegend leg(legendX1, 0.61, legendX2, 0.87);
 		leg.SetBorderSize(0);
 		leg.SetFillStyle(0);
 		leg.SetTextFont(42);
-		leg.SetTextSize(0.035);
-		leg.AddEntry(&hPsi, Form("#psi(2S), cut %g cm", s.lxyCutPsi), "l");
-		leg.AddEntry(&hX, Form("X(3872), cut %g cm", s.lxyCutX), "l");
+		leg.SetTextSize(0.028);
+		const double psiRetained = isNonPrompt ? nonPromptPsiRetained : promptPsiRetained;
+		const double xRetained = isNonPrompt ? nonPromptXRetained : promptXRetained;
+		const TString psiLabel = Form("#psi(2S), retained %.2f%%", psiRetained);
+		const TString xLabel = Form("X(3872), retained %.2f%%", xRetained);
+		leg.SetHeader(Form("#bf{MC %s, %s}",
+		                   isNonPrompt ? "non Prompt" : "Prompt", s.ptLabel.Data()),
+		              "L");
+		leg.AddEntry(&hPsi, psiLabel, "l");
+		leg.AddEntry(&hX, xLabel, "l");
+		leg.AddEntry(&lxyCut,
+		             Form("%s %s %g cm", s.lxyLabel.Data(), isNonPrompt ? ">" : "<", s.lxyCut),
+		             "l");
 		leg.Draw();
 
 		TLatex text;
@@ -102,13 +145,6 @@ void plot_nonPrompt_lxyShapes(TString systemNAME = "ppRef")
 		text.SetTextSize(0.042);
 		text.SetTextAlign(11);
 		text.DrawLatex(0.16, 0.95, "#bf{CMS} #it{Simulation}");
-		text.SetTextAlign(31);
-		text.SetTextSize(0.035);
-		text.DrawLatex(0.95, 0.95, s.collisionText);
-		text.SetTextSize(0.040);
-		text.DrawLatex(0.93, 0.87, isNonPrompt ? "#bf{Nonprompt}" : "#bf{Prompt}");
-		text.SetTextSize(0.035);
-		text.DrawLatex(0.93, 0.65, s.ptLabel);
 		c.SaveAs(Form("%s/lxy_%s_X_PSI2S.pdf", s.outDir.Data(), isNonPrompt ? "nonPrompt" : "prompt"));
 	}
 
